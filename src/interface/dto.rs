@@ -1,7 +1,7 @@
 use crate::domain::model::MQLogUsage;
-use actix_web::HttpResponse;
 use actix_web::http::StatusCode;
-use chrono::{DateTime, Local, Utc};
+use actix_web::{HttpResponse, Responder};
+use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize)]
@@ -18,7 +18,7 @@ where
 
 impl<T> ApiResponse<T>
 where
-    T: Serialize
+    T: Serialize,
 {
     pub fn success(message: &str, data: Option<T>) -> Self {
         Self {
@@ -41,6 +41,16 @@ where
 impl<T: Serialize> Into<HttpResponse> for ApiResponse<T> {
     fn into(self) -> HttpResponse {
         HttpResponse::build(self.status_code).json(self)
+    }
+}
+impl<T: Serialize> Responder for ApiResponse<T> {
+    type Body = actix_web::body::BoxBody;
+
+    fn respond_to(self, _: &actix_web::HttpRequest) -> HttpResponse<Self::Body> {
+        // Serialize the ApiResponse to JSON and return it with a 200 OK status
+        HttpResponse::Ok()
+            .content_type("application/json")
+            .json(self)
     }
 }
 
