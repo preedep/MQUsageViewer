@@ -61,7 +61,7 @@ where
             .headers()
             .get(AUTHORIZATION)
             .and_then(|h| h.to_str().ok());
-        let app_state = self.app_state.clone(); // ✅ ใช้ app_state ได้ตรงนี้
+        //let app_state = self.app_state.clone(); // ✅ ใช้ app_state ได้ตรงนี้
 
         let is_valid = if let Some(header_value) = auth_header {
             if header_value.starts_with("Bearer ") {

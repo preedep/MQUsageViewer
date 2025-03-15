@@ -1,5 +1,6 @@
 use crate::domain::model::MQLogUsage;
 use chrono::{DateTime, Local};
+use log::debug;
 use rusqlite::ToSql;
 
 const MQ_USAGE_TABLE: &str = "mq_data";
@@ -48,21 +49,28 @@ pub async fn get_mq_log_usage(
     mq_function: &str,
     system_name: Option<&str>,
 ) -> Result<Vec<MQLogUsage>, Box<dyn std::error::Error>> {
+    debug!(
+        "get_mq_log_usage: start_date: {}, end_date: {}, mq_function: {}",
+        start_date, end_date, mq_function
+    );
     let mut params = vec![mq_function];
     let mut sql = format!("SELECT * FROM {} WHERE mq_function = ?1", MQ_USAGE_TABLE);
 
-    if let Some(system_name) = system_name {
-        sql.push_str(" AND system_name = ?2");
-        params.push(system_name);
-    }
-
-    sql.push_str(" AND date_time BETWEEN ?3 AND ?4");
+    sql.push_str(" AND date_time BETWEEN ?2 AND ?3");
 
     let start_date_str = start_date.to_rfc3339();
     let end_date_str = end_date.to_rfc3339();
 
     params.push(&start_date_str);
     params.push(&end_date_str);
+
+    if let Some(system_name) = system_name {
+        sql.push_str(" AND system_name = ?4");
+        params.push(system_name);
+    }
+
+
+
 
     let params: Vec<&dyn ToSql> = params.iter().map(|s| s as &dyn ToSql).collect();
 
@@ -71,13 +79,14 @@ pub async fn get_mq_log_usage(
     let mut mq_log_usage_list = Vec::new();
 
     while let Some(row) = rows.next()? {
-        let date_time: DateTime<Local> = row.get(0)?;
-        let date: String = row.get(1)?;
-        let minute: String = row.get(2)?;
-        let system_name: String = row.get(3)?;
-        let mq_function: String = row.get(4)?;
-        let work_total: f64 = row.get(5)?;
-        let trans_per_sec: f64 = row.get(6)?;
+        // idx = 0 , id
+        let date_time: DateTime<Local> = row.get(1)?;
+        let date: String = row.get(2)?;
+        let minute: String = row.get(3)?;
+        let system_name: String = row.get(4)?;
+        let mq_function: String = row.get(5)?;
+        let work_total: f64 = row.get(6)?;
+        let trans_per_sec: f64 = row.get(7)?;
         mq_log_usage_list.push(MQLogUsage {
             date_time,
             date,

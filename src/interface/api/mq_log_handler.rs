@@ -3,6 +3,7 @@ use crate::infrastructure::app_state::AppState;
 use crate::interface::dto::{ApiResponse, SearchMqLogRequest, SearchMqLogResponse};
 use actix_web::http::StatusCode;
 use actix_web::{get, post, web};
+use log::{debug, error};
 use rusqlite::fallible_iterator::FallibleIterator;
 
 #[get("/mq/{function}/systems")]
@@ -38,6 +39,13 @@ pub async fn mq_search(
     data: web::Json<SearchMqLogRequest>,
 ) -> impl actix_web::Responder {
     let connection = app_state.db.lock().unwrap();
+    debug!(
+        "mq_search: start_date: {}, end_date: {}, mq_function: {}",
+        data.0.from_datetime,
+        data.0.to_datetime,
+        data.0.mq_function_name);
+
+
     let start_date = data.0.from_datetime;
     let end_date = data.0.to_datetime;
     let mq_function = &data.0.mq_function_name;
@@ -65,6 +73,10 @@ pub async fn mq_search(
         }
         Err(e) => {
             let message = format!("Error: {}", e.to_string());
+            error!(
+                "mq_search: Error: {}",
+                e.to_string());
+
             ApiResponse::<Vec<SearchMqLogResponse>>::error(
                 &message,
                 StatusCode::INTERNAL_SERVER_ERROR,
