@@ -8,15 +8,15 @@ pub async fn get_system_name_list(
     connection: &rusqlite::Connection,
     mq_function: &str,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let mut stmt = connection.prepare(
-        format!(
-            "SELECT DISTINCT system_name FROM {} where mq_function = {} order by system_name ",
-            MQ_USAGE_TABLE,
-            mq_function
-        )
-            .as_str(),
-    )?;
-    let rows = stmt.query_map([], |row| row.get(0))?;
+
+    let sql = format!(
+        "SELECT DISTINCT system_name FROM {} WHERE mq_function = ? ORDER BY system_name",
+        MQ_USAGE_TABLE
+    );
+
+    let mut stmt = connection.prepare(&sql)?;
+
+    let rows = stmt.query_map([mq_function], |row| row.get(0))?;
     let mut system_names = Vec::new();
     for system_name in rows {
         system_names.push(system_name?);

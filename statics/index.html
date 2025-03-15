@@ -66,10 +66,10 @@
 <!-- 🔍 Search Criteria Panel -->
 <div class="search-panel">
     <label for="start-datetime">Start Date-Time:</label>
-    <input type="datetime-local" id="start-datetime" name="start-datetime" value="2024-01-01T00:00">
+    <input type="datetime-local" id="start-datetime" value="2024-01-01T00:00">
 
     <label for="end-datetime">End Date-Time:</label>
-    <input type="datetime-local" id="end-datetime" name="end-datetime">
+    <input type="datetime-local" id="end-datetime">
 
     <label for="mq-function">MQ Function:</label>
     <select id="mq-function">
@@ -78,10 +78,7 @@
 
     <label for="system-name">System Name:</label>
     <select id="system-name">
-        <option value="">-- Select System Name --</option>
-        <option value="CBS">CBS</option>
-        <option value="LOANS">LOANS</option>
-        <option value="GL">GL</option>
+        <option value="">-- Select MQ Function First --</option>
     </select>
 
     <button id="search-btn">Search</button>
@@ -116,19 +113,15 @@
         window.location.href = "/login.html";
     });
 
-    // ⏬ Load MQ Function List from API
+    // ⏬ Load MQ Function List
     async function loadMqFunctions() {
         const mqFunctionSelect = document.getElementById('mq-function');
         try {
             const response = await fetch('/api/v1/mq/functions', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-
-            if (response.ok) {
-                const result = await response.json();
+            const result = await response.json();
+            if (response.ok && result.success && result.data) {
                 mqFunctionSelect.innerHTML = '<option value="">-- Select MQ Function --</option>';
                 result.data.forEach(func => {
                     const opt = document.createElement('option');
@@ -137,11 +130,10 @@
                     mqFunctionSelect.appendChild(opt);
                 });
             } else {
-                throw new Error("Cannot load MQ function list");
+                throw new Error(result.message || "Unable to load MQ Functions");
             }
         } catch (err) {
-            console.error("Error loading MQ function list:", err);
-            // Fallback static list
+            console.error("MQ Function Load Error:", err.message);
             mqFunctionSelect.innerHTML = `
                 <option value="">-- Select MQ Function --</option>
                 <option value="PutMessage">PutMessage</option>
@@ -149,6 +141,42 @@
                 <option value="BrowseMessage">BrowseMessage</option>`;
         }
     }
+
+    // ⏬ Load System Name List when MQ Function selected
+    async function loadSystemNamesForFunction(functionName) {
+        const systemNameSelect = document.getElementById('system-name');
+        if (!functionName) {
+            systemNameSelect.innerHTML = '<option value="">-- Select MQ Function First --</option>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/v1/mq/${functionName}/systems`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await response.json();
+            if (response.ok && result.success && result.data) {
+                systemNameSelect.innerHTML = '<option value="">-- Select System Name --</option>';
+                result.data.forEach(sys => {
+                    const opt = document.createElement('option');
+                    opt.value = sys;
+                    opt.textContent = sys;
+                    systemNameSelect.appendChild(opt);
+                });
+            } else {
+                throw new Error(result.message || "Unable to load systems");
+            }
+        } catch (err) {
+            console.error("System Load Error:", err.message);
+            systemNameSelect.innerHTML = '<option value="">-- Failed to load systems --</option>';
+        }
+    }
+
+    // On MQ Function Change
+    document.getElementById('mq-function').addEventListener('change', (e) => {
+        const selectedFunction = e.target.value;
+        loadSystemNamesForFunction(selectedFunction);
+    });
 
     // 🔍 Search Handler
     document.getElementById('search-btn').addEventListener('click', async () => {
@@ -173,20 +201,18 @@
                 },
                 body: JSON.stringify(query)
             });
-
             const result = await response.json();
-
-            if (response.ok && result) {
-                document.getElementById('search-result').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+            if (response.ok && result.success && result.data) {
+                document.getElementById('search-result').innerHTML = `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
             } else {
-                document.getElementById('search-result').textContent = "Search failed: " + (result?.message || "Unknown error");
+                document.getElementById('search-result').textContent = "Search failed: " + (result.message || "Unknown error");
             }
         } catch (err) {
-            document.getElementById('search-result').textContent = "Error: " + err.message;
+            document.getElementById('search-result').textContent = "Search error: " + err.message;
         }
     });
 
-    // 🚀 Load MQ Function List on Page Load
+    // Initial Load
     document.addEventListener('DOMContentLoaded', () => {
         loadMqFunctions();
     });
