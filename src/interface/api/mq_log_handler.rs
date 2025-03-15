@@ -4,7 +4,6 @@ use actix_web::http::StatusCode;
 use actix_web::{post, web};
 use rusqlite::fallible_iterator::FallibleIterator;
 
-
 #[post("/mq/search")]
 pub async fn search_mq_log(
     app_state: web::Data<AppState>,
@@ -38,10 +37,7 @@ pub async fn search_mq_log(
         }
         Err(e) => {
             let message = format!("Error: {}", e.to_string());
-            ApiResponse::<Vec<SearchMqLogResponse>>::error(
-                &message,
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )
+            ApiResponse::<Vec<SearchMqLogResponse>>::error(&message, StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }

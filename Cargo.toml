@@ -8,6 +8,9 @@ pretty_env_logger = "0.5"
 log = "0.4"
 dotenv = "0.15"
 actix-web = "4"
+actix-files = "0.6"
+actix-web-httpauth = "0.8"
+jsonwebtoken = "9.3"
 serde = { version = "1" , features = ["derive"] }
 serde_json = "1"
 
@@ -15,3 +18,5 @@ rusqlite = { version = "0.34" , features = ["chrono"] }
 chrono = { version = "0.4", features = ["serde"] }
 plotters = "0.3"
 plotters-svg = "0.3"
+
+
