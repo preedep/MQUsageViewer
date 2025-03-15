@@ -1,10 +1,13 @@
-use rusqlite::ToSql;
 use crate::domain::model::MQLogUsage;
+use chrono::{DateTime, Local};
+use rusqlite::ToSql;
 
-const MQ_USAGE_TABLE: &str = "mqdata";
+const MQ_USAGE_TABLE: &str = "mq_data";
 
 pub async fn get_mq_log_usage(
     connection: &rusqlite::Connection,
+    start_date: &DateTime<Local>,
+    end_date: &DateTime<Local>,
     mq_function: &str,
     system_name: Option<&str>,
 ) -> Result<Vec<MQLogUsage>, Box<dyn std::error::Error>> {
@@ -16,6 +19,14 @@ pub async fn get_mq_log_usage(
         params.push(system_name);
     }
 
+    sql.push_str(" AND date_time BETWEEN ?3 AND ?4");
+
+    let start_date_str = start_date.to_rfc3339();
+    let end_date_str = end_date.to_rfc3339();
+
+    params.push(&start_date_str);
+    params.push(&end_date_str);
+
     let params: Vec<&dyn ToSql> = params.iter().map(|s| s as &dyn ToSql).collect();
 
     let mut stmt = connection.prepare(&sql)?;
@@ -23,14 +34,21 @@ pub async fn get_mq_log_usage(
     let mut mq_log_usage_list = Vec::new();
 
     while let Some(row) = rows.next()? {
+        let date_time: DateTime<Local> = row.get(0)?;
+        let date: String = row.get(1)?;
+        let minute: String = row.get(2)?;
+        let system_name: String = row.get(3)?;
+        let mq_function: String = row.get(4)?;
+        let work_total: f64 = row.get(5)?;
+        let trans_per_sec: f64 = row.get(6)?;
         mq_log_usage_list.push(MQLogUsage {
-            date_time: Default::default(),
-            date: "".to_string(),
-            minute: "".to_string(),
-            system_name: "".to_string(),
-            mq_function: "".to_string(),
-            work_total: 0.0,
-            trans_per_sec: 0.0,
+            date_time,
+            date,
+            minute,
+            system_name,
+            mq_function,
+            work_total,
+            trans_per_sec,
         });
     }
     Ok(mq_log_usage_list)

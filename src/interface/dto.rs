@@ -1,11 +1,53 @@
+use crate::domain::model::MQLogUsage;
+use actix_web::HttpResponse;
+use actix_web::http::StatusCode;
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
-use crate::domain::model::MQLogUsage;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ApiResponse<T>
+where
+    T: Serialize,
+{
+    pub data: Option<T>,
+    pub success: bool,
+    pub message: String,
+    #[serde(skip_serializing)]
+    pub status_code: StatusCode,
+}
+
+impl<T> ApiResponse<T>
+where
+    T: Serialize
+{
+    pub fn success(message: &str, data: Option<T>) -> Self {
+        Self {
+            success: true,
+            message: message.to_string(),
+            data,
+            status_code: StatusCode::OK,
+        }
+    }
+    pub fn error(message: &str, status_code: StatusCode) -> Self {
+        Self {
+            success: false,
+            message: message.to_string(),
+            data: None,
+            status_code,
+        }
+    }
+}
+
+impl<T: Serialize> Into<HttpResponse> for ApiResponse<T> {
+    fn into(self) -> HttpResponse {
+        HttpResponse::build(self.status_code).json(self)
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchMqLogRequest {
-    pub from_datetime: DateTime<Utc>,
-    pub to_datetime: DateTime<Utc>,
+    pub from_datetime: DateTime<Local>,
+    pub to_datetime: DateTime<Local>,
     pub mq_function_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system_name: Option<String>,

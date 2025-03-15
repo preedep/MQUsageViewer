@@ -1,12 +1,11 @@
-
-use std::sync::{Arc, Mutex};
-use actix_web::{web, App, HttpServer};
+use actix_web::{App, HttpServer, web};
 use log::info;
+use std::sync::{Arc, Mutex};
 
 mod application;
 mod domain;
-mod interface;
 mod infrastructure;
+mod interface;
 
 #[actix_web::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,20 +16,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let connection = rusqlite::Connection::open("datasets/mqdata.db")?;
     let app_state = infrastructure::app_state::AppState {
-        db: Arc::new(Mutex::new(connection))
-
+        db: Arc::new(Mutex::new(connection)),
     };
     HttpServer::new(move || {
-            App::new()
-                .wrap(actix_web::middleware::Logger::default())
-                .app_data(web::Data::new(app_state.clone()))
-                .service(
-                    web::scope("/api/v1")
-                        .service(interface::api::mq_log_handler::search_mq_log)
-                )
-    }).bind(("0.0.0.0",8888))?
-        .run()
-        .await?;
+        App::new()
+            .wrap(actix_web::middleware::Logger::default())
+            .app_data(web::Data::new(app_state.clone()))
+            .service(web::scope("/api/v1").service(interface::api::mq_log_handler::search_mq_log))
+    })
+    .bind(("0.0.0.0", 8888))?
+    .run()
+    .await?;
 
     Ok(())
 }
