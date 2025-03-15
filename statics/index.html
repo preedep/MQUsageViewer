@@ -73,10 +73,7 @@
 
     <label for="mq-function">MQ Function:</label>
     <select id="mq-function">
-        <option value="">-- Select MQ Function --</option>
-        <option value="PutMessage">PutMessage</option>
-        <option value="GetMessage">GetMessage</option>
-        <option value="BrowseMessage">BrowseMessage</option>
+        <option value="">-- Loading MQ Functions... --</option>
     </select>
 
     <label for="system-name">System Name:</label>
@@ -119,6 +116,40 @@
         window.location.href = "/login.html";
     });
 
+    // ⏬ Load MQ Function List from API
+    async function loadMqFunctions() {
+        const mqFunctionSelect = document.getElementById('mq-function');
+        try {
+            const response = await fetch('/api/v1/mq/functions', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                mqFunctionSelect.innerHTML = '<option value="">-- Select MQ Function --</option>';
+                result.data.forEach(func => {
+                    const opt = document.createElement('option');
+                    opt.value = func;
+                    opt.textContent = func;
+                    mqFunctionSelect.appendChild(opt);
+                });
+            } else {
+                throw new Error("Cannot load MQ function list");
+            }
+        } catch (err) {
+            console.error("Error loading MQ function list:", err);
+            // Fallback static list
+            mqFunctionSelect.innerHTML = `
+                <option value="">-- Select MQ Function --</option>
+                <option value="PutMessage">PutMessage</option>
+                <option value="GetMessage">GetMessage</option>
+                <option value="BrowseMessage">BrowseMessage</option>`;
+        }
+    }
+
     // 🔍 Search Handler
     document.getElementById('search-btn').addEventListener('click', async () => {
         const startDatetime = document.getElementById('start-datetime').value;
@@ -153,6 +184,11 @@
         } catch (err) {
             document.getElementById('search-result').textContent = "Error: " + err.message;
         }
+    });
+
+    // 🚀 Load MQ Function List on Page Load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadMqFunctions();
     });
 </script>
 </body>

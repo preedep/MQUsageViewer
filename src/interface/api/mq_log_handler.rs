@@ -1,10 +1,23 @@
-use crate::application::mq_log_usage_service::{get_mq_function_list, get_mq_log_usage};
+use crate::application::mq_log_usage_service::{get_mq_function_list, get_mq_log_usage, get_system_name_list};
 use crate::infrastructure::app_state::AppState;
 use crate::interface::dto::{ApiResponse, SearchMqLogRequest, SearchMqLogResponse};
 use actix_web::http::StatusCode;
 use actix_web::{get, post, web};
 use rusqlite::fallible_iterator::FallibleIterator;
 
+#[get("/mq/{function}/systems")]
+pub async fn mq_function_systems(app_state: web::Data<AppState>,
+                                 path: web::Path<(String,)>) -> impl actix_web::Responder {
+    let connection = app_state.db.lock().unwrap();
+    let function = &path.0;
+    match get_system_name_list(&connection, function).await {
+        Ok(result) => ApiResponse::<Vec<String>>::success("Success", Some(result)),
+        Err(e) => ApiResponse::<Vec<String>>::error(
+            &format!("Error: {}", e),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ),
+    }
+}
 #[get("/mq/functions")]
 pub async fn mq_functions(app_state: web::Data<AppState>) -> impl actix_web::Responder {
     // Lock the database mutex to get a Connection
