@@ -3,7 +3,7 @@ use actix_web::{post, web, HttpResponse};
 use crate::infrastructure::app_state::AppState;
 use crate::interface::dto::SearchMqLogRequest;
 
-#[post("/search")]
+#[post("/mq/search")]
 pub async fn search_mq_log(
     app_state: web::Data<AppState>,
     data: web::Json<SearchMqLogRequest>,
