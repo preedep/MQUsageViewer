@@ -1,3 +1,4 @@
+use rusqlite::ToSql;
 use crate::domain::model::MQLogUsage;
 
 const MQ_USAGE_TABLE: &str = "mqdata";
@@ -14,6 +15,8 @@ pub async fn get_mq_log_usage(
         sql.push_str(" AND system_name = ?2");
         params.push(system_name);
     }
+
+    let params: Vec<&dyn ToSql> = params.iter().map(|s| s as &dyn ToSql).collect();
 
     let mut stmt = connection.prepare(&sql)?;
     let mut rows = stmt.query(params.as_slice())?;

@@ -1,1 +1,1 @@
-mod mq_log_usage_service;
+pub mod mq_log_usage_service;

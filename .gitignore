@@ -25,3 +25,5 @@ target/
 /.idea/modules.xml
 /.idea/vcs.xml
 /.idea/MQUsageViewer.iml
+/datasets/mqdata.db
+/mqdata.db
