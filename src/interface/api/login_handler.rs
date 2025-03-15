@@ -10,11 +10,9 @@ pub async fn login(
 ) -> impl actix_web::Responder {
     match auth_service::login_user(req.into_inner(), &app_state) {
         Some(resp) => ApiResponse::<LoginResponse>::success("Success", Some(resp)),
-        None => {
-            ApiResponse::<LoginResponse>::error(
-                "Invalid credentials",
-                actix_web::http::StatusCode::UNAUTHORIZED,
-            )
-        }
+        None => ApiResponse::<LoginResponse>::error(
+            "Invalid credentials",
+            actix_web::http::StatusCode::UNAUTHORIZED,
+        ),
     }
 }

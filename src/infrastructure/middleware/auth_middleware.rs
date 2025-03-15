@@ -1,11 +1,14 @@
-use actix_web::{
-    dev::{ServiceRequest, ServiceResponse, Transform, forward_ready},
-    Error, HttpResponse, body::{BoxBody, MessageBody}, http::header::AUTHORIZATION, web,
-};
-use futures_util::future::{LocalBoxFuture, Ready, ready};
-use jsonwebtoken::{decode, DecodingKey, Validation};
 use crate::domain::auth::Claims;
 use crate::infrastructure::app_state::AppState;
+use actix_web::{
+    body::{BoxBody, MessageBody}, dev::{forward_ready, ServiceRequest, ServiceResponse, Transform},
+    http::header::AUTHORIZATION,
+    web,
+    Error,
+    HttpResponse,
+};
+use futures_util::future::{ready, LocalBoxFuture, Ready};
+use jsonwebtoken::{decode, DecodingKey, Validation};
 
 #[derive(Clone)]
 pub struct AuthMiddleware {
@@ -20,7 +23,8 @@ impl AuthMiddleware {
 
 impl<S> Transform<S, ServiceRequest> for AuthMiddleware
 where
-    S: actix_service::Service<ServiceRequest, Response = ServiceResponse<BoxBody>, Error = Error> + 'static,
+    S: actix_service::Service<ServiceRequest, Response=ServiceResponse<BoxBody>, Error=Error>
+    + 'static,
 {
     type Response = ServiceResponse<BoxBody>;
     type Error = Error;
@@ -43,7 +47,8 @@ pub struct AuthMiddlewareMiddleware<S> {
 
 impl<S> actix_service::Service<ServiceRequest> for AuthMiddlewareMiddleware<S>
 where
-    S: actix_service::Service<ServiceRequest, Response = ServiceResponse<BoxBody>, Error = Error> + 'static,
+    S: actix_service::Service<ServiceRequest, Response=ServiceResponse<BoxBody>, Error=Error>
+    + 'static,
 {
     type Response = ServiceResponse<BoxBody>;
     type Error = Error;
@@ -52,7 +57,10 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        let auth_header = req.headers().get(AUTHORIZATION).and_then(|h| h.to_str().ok());
+        let auth_header = req
+            .headers()
+            .get(AUTHORIZATION)
+            .and_then(|h| h.to_str().ok());
         let app_state = self.app_state.clone(); // ✅ ใช้ app_state ได้ตรงนี้
 
         let is_valid = if let Some(header_value) = auth_header {
@@ -79,7 +87,7 @@ where
                 Ok(req.into_response(
                     HttpResponse::Unauthorized()
                         .body("Unauthorized")
-                        .map_into_boxed_body()
+                        .map_into_boxed_body(),
                 ))
             })
         }

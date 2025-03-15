@@ -1,8 +1,8 @@
+use crate::infrastructure::middleware::auth_middleware::AuthMiddleware;
 use actix_files::Files;
 use actix_web::{App, HttpServer, web};
 use log::info;
 use std::sync::{Arc, Mutex};
-use crate::infrastructure::middleware::auth_middleware::AuthMiddleware;
 
 mod application;
 mod domain;
@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 web::scope("/api/v1")
                     .wrap(AuthMiddleware::new(web::Data::new(app_state.clone())))
                     .service(interface::api::mq_log_handler::mq_search)
-                    .service(interface::api::mq_log_handler::mq_functions)
+                    .service(interface::api::mq_log_handler::mq_functions),
             )
             .service(Files::new("/", "./statics").index_file("index.html"))
     })
