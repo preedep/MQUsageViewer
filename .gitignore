@@ -22,3 +22,6 @@ target/
 /.idea/.gitignore
 /Cargo.lock
 /.idea/material_theme_project_new.xml
+/.idea/modules.xml
+/.idea/vcs.xml
+/.idea/MQUsageViewer.iml
