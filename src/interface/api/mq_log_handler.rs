@@ -1,9 +1,9 @@
 use crate::infrastructure::app_state::AppState;
 use crate::interface::dto::{ApiResponse, SearchMqLogRequest, SearchMqLogResponse};
 use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, post, web};
+use actix_web::{post, web};
 use rusqlite::fallible_iterator::FallibleIterator;
-use std::error::Error;
+
 
 #[post("/mq/search")]
 pub async fn search_mq_log(
