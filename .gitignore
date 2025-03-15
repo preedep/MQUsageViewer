@@ -27,3 +27,4 @@ target/
 /.idea/MQUsageViewer.iml
 /datasets/mqdata.db
 /mqdata.db
+/.env
