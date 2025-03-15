@@ -5,7 +5,7 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{EncodingKey, Header, encode};
 
 pub fn login_user(req: LoginRequest, app_state: &AppState) -> Option<LoginResponse> {
-    if req.username == "admin" && req.password == "password" {
+    if req.username == app_state.user_name && req.password == app_state.password {
         let exp = Utc::now() + Duration::hours(24);
         let claims = Claims {
             sub: req.username,
@@ -14,7 +14,7 @@ pub fn login_user(req: LoginRequest, app_state: &AppState) -> Option<LoginRespon
         let token = encode(
             &Header::default(),
             &claims,
-            &EncodingKey::from_secret(app_state.salt_key.as_bytes()),
+            &EncodingKey::from_secret(app_state.secret_value.as_bytes()),
         )
         .unwrap();
         Some(LoginResponse { token })

@@ -15,11 +15,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Starting MQ Usage Viewer (Demo) on http://localhost:8080");
 
+    let user_name = std::env::var("USER_NAME").expect("USER_NAME must be set");
+    let password = std::env::var("PASSWORD").expect("PASSWORD must be set");
+    let secret_value = std::env::var("SECRET_VALUE").expect("SECRET_VALUE must be set");
+    let salt_key = std::env::var("SALT_KEY").expect("SALT_KEY must be set");
+
     let connection = rusqlite::Connection::open("datasets/mqdata.db")?;
     let app_state = infrastructure::app_state::AppState {
         db: Arc::new(Mutex::new(connection)),
-        user_name: "".to_string(),
-        salt_key: "".to_string(),
+        user_name,
+        password,
+        secret_value,
+        salt_key,
     };
     HttpServer::new(move || {
         App::new()

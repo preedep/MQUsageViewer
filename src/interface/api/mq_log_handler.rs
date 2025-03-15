@@ -37,7 +37,10 @@ pub async fn search_mq_log(
         }
         Err(e) => {
             let message = format!("Error: {}", e.to_string());
-            ApiResponse::<Vec<SearchMqLogResponse>>::error(&message, StatusCode::INTERNAL_SERVER_ERROR)
+            ApiResponse::<Vec<SearchMqLogResponse>>::error(
+                &message,
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )
         }
     }
 }

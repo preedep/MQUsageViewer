@@ -5,5 +5,7 @@ use std::sync::{Arc, Mutex};
 pub struct AppState {
     pub db: Arc<Mutex<Connection>>,
     pub user_name: String,
+    pub password: String,
+    pub secret_value: String,
     pub salt_key: String,
 }
