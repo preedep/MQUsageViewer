@@ -51,22 +51,42 @@
     </style>
 </head>
 <body>
+<script>
+    let token = localStorage.getItem('access_token');
+
+    function isTokenExpired(token) {
+        if (!token) return true;
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            return payload.exp < Math.floor(Date.now() / 1000);
+        } catch (e) {
+            return true;
+        }
+    }
+
+    if (token && !isTokenExpired(token)) {
+        window.location.href = "/index.html";
+    }
+</script>
+
+<!-- login container UI -->
 <div class="login-container">
     <h2>Login</h2>
     <form id="login-form">
-        <label for="username"></label><input type="text" id="username" placeholder="Username" required>
-        <label for="password"></label><input type="password" id="password" placeholder="Password" required>
+        <input type="text" id="username" placeholder="Username" required>
+        <input type="password" id="password" placeholder="Password" required>
         <button type="submit">Login</button>
         <div class="error-message" id="error-message"></div>
     </form>
 </div>
 
+<!-- ✅ ไม่ต้องประกาศ token ซ้ำ -->
 <script>
     const form = document.getElementById('login-form');
     const errorMessage = document.getElementById('error-message');
 
     form.addEventListener('submit', async (e) => {
-        e.preventDefault(); // Prevent form reload
+        e.preventDefault();
 
         const username = document.getElementById('username').value.trim();
         const password = document.getElementById('password').value.trim();
@@ -74,23 +94,24 @@
         try {
             const response = await fetch('/auth/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password }),
             });
 
             if (response.ok) {
                 const result = await response.json();
-                // Store the JWT Token in localStorage
-                localStorage.setItem('access_token', result.token);
 
-                // Redirect or call protected API
-                alert("Login success!");
-                window.location.href = '/index.html'; // redirect to another page
+                if (result?.data?.token) {
+                    localStorage.setItem('access_token', result.data.token);
+                    window.location.href = "/index.html";
+                } else {
+                    console.error("Login success but no token in response:", result);
+                    document.getElementById('error-message').textContent = "Unexpected response from server: token missing.";
+                }
+
             } else {
-                const errorText = await response.text();
-                errorMessage.textContent = `Login failed: ${errorText}`;
+                const err = await response.text();
+                errorMessage.textContent = `Login failed: ${err}`;
             }
         } catch (err) {
             errorMessage.textContent = `Network error: ${err.message}`;
