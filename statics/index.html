@@ -4,50 +4,156 @@
     <meta charset="UTF-8">
     <title>MQ Usage Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .search-panel {
+            background-color: #fff;
+            padding: 16px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+        }
+        .search-panel label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+        .search-panel input,
+        .search-panel select,
+        .search-panel button {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .search-panel button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .search-panel button:hover {
+            background-color: #0056b3;
+        }
+        #search-result {
+            background-color: #fff;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+            white-space: pre-wrap;
+        }
+    </style>
 </head>
 <body>
-<h1>Welcome to MQ Usage Dashboard</h1>
-<p>This is a protected page that requires login.</p>
-<button id="logout-btn">Logout</button>
+
+<div class="header">
+    <h1>MQ Usage Dashboard</h1>
+    <button id="logout-btn">Logout</button>
+</div>
+
+<!-- 🔍 Search Criteria Panel -->
+<div class="search-panel">
+    <label for="start-datetime">Start Date-Time:</label>
+    <input type="datetime-local" id="start-datetime" name="start-datetime" value="2024-01-01T00:00">
+
+    <label for="end-datetime">End Date-Time:</label>
+    <input type="datetime-local" id="end-datetime" name="end-datetime">
+
+    <label for="mq-function">MQ Function:</label>
+    <select id="mq-function">
+        <option value="">-- Select MQ Function --</option>
+        <option value="PutMessage">PutMessage</option>
+        <option value="GetMessage">GetMessage</option>
+        <option value="BrowseMessage">BrowseMessage</option>
+    </select>
+
+    <label for="system-name">System Name:</label>
+    <select id="system-name">
+        <option value="">-- Select System Name --</option>
+        <option value="CBS">CBS</option>
+        <option value="LOANS">LOANS</option>
+        <option value="GL">GL</option>
+    </select>
+
+    <button id="search-btn">Search</button>
+</div>
+
+<!-- ✅ Search Result -->
+<div id="search-result">
+    <!-- Result from API will appear here -->
+</div>
 
 <script>
-    // Helper: Check if token is expired
+    // 🔐 Token Validation
     function isTokenExpired(token) {
         if (!token) return true;
         try {
-            const payloadBase64 = token.split('.')[1];
-            const payloadJson = atob(payloadBase64);
-            const payload = JSON.parse(payloadJson);
-            const now = Math.floor(Date.now() / 1000);
-            return payload.exp && payload.exp < now;
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            return payload.exp < Math.floor(Date.now() / 1000);
         } catch (e) {
             return true;
         }
     }
 
-    // Main Auth Check
     const token = localStorage.getItem('access_token');
     if (!token || isTokenExpired(token)) {
-        console.warn("Token invalid or expired. Redirecting to login.");
         localStorage.removeItem('access_token');
         window.location.href = "/login.html";
     }
 
-    // Logout
-    const logoutBtn = document.getElementById('logout-btn');
-    logoutBtn.addEventListener('click', () => {
+    // 🔐 Logout Handler
+    document.getElementById('logout-btn').addEventListener('click', () => {
         localStorage.removeItem('access_token');
         window.location.href = "/login.html";
     });
 
-    // OPTIONAL: Fetch protected data after auth passed
-    // fetch('/api/v1/your-api', {
-    //     headers: {
-    //         'Authorization': `Bearer ${token}`
-    //     }
-    // }).then(res => res.json()).then(data => {
-    //     console.log(data);
-    // });
+    // 🔍 Search Handler
+    document.getElementById('search-btn').addEventListener('click', async () => {
+        const startDatetime = document.getElementById('start-datetime').value;
+        const endDatetime = document.getElementById('end-datetime').value;
+        const mqFunction = document.getElementById('mq-function').value;
+        const systemName = document.getElementById('system-name').value;
+
+        const query = {
+            start_datetime: startDatetime,
+            end_datetime: endDatetime,
+            mq_function: mqFunction,
+            system_name: systemName
+        };
+
+        try {
+            const response = await fetch('/api/v1/mq-log/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(query)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result) {
+                document.getElementById('search-result').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+            } else {
+                document.getElementById('search-result').textContent = "Search failed: " + (result?.message || "Unknown error");
+            }
+        } catch (err) {
+            document.getElementById('search-result').textContent = "Error: " + err.message;
+        }
+    });
 </script>
 </body>
 </html>

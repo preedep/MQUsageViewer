@@ -4,6 +4,15 @@ use rusqlite::ToSql;
 
 const MQ_USAGE_TABLE: &str = "mq_data";
 
+pub async fn get_mq_function_list(connection: &rusqlite::Connection) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let mut stmt = connection.prepare(format!("SELECT DISTINCT mq_function FROM {} order by mq_function ",MQ_USAGE_TABLE).as_str())?;
+    let rows = stmt.query_map([], |row| row.get(0))?;
+    let mut mq_functions = Vec::new();
+    for mq_function in rows {
+        mq_functions.push(mq_function?);
+    }
+    Ok(mq_functions)
+}
 pub async fn get_mq_log_usage(
     connection: &rusqlite::Connection,
     start_date: &DateTime<Local>,

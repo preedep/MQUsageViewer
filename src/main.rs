@@ -37,7 +37,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .service(
                 web::scope("/api/v1")
                     .wrap(AuthMiddleware::new(web::Data::new(app_state.clone())))
-                    .service(interface::api::mq_log_handler::search_mq_log)
+                    .service(interface::api::mq_log_handler::mq_search)
+                    .service(interface::api::mq_log_handler::mq_functions)
             )
             .service(Files::new("/", "./statics").index_file("index.html"))
     })
