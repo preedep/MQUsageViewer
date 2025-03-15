@@ -2,6 +2,7 @@ use actix_files::Files;
 use actix_web::{App, HttpServer, web};
 use log::info;
 use std::sync::{Arc, Mutex};
+use crate::infrastructure::middleware::auth_middleware::AuthMiddleware;
 
 mod application;
 mod domain;
@@ -32,10 +33,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         App::new()
             .wrap(actix_web::middleware::Logger::default())
             .app_data(web::Data::new(app_state.clone()))
+            .service(interface::api::login_handler::login)
             .service(
                 web::scope("/api/v1")
+                    .wrap(AuthMiddleware::new(web::Data::new(app_state.clone())))
                     .service(interface::api::mq_log_handler::search_mq_log)
-                    .service(interface::api::login_handler::login),
             )
             .service(Files::new("/", "./statics").index_file("index.html"))
     })
