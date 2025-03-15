@@ -20,7 +20,6 @@
             background-color: #fff;
             padding: 16px;
             margin-top: 20px;
-            margin-bottom: 20px;
             border-radius: 8px;
             box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
         }
@@ -30,31 +29,88 @@
             font-weight: bold;
         }
         .search-panel input,
-        .search-panel select,
-        .search-panel button {
+        .search-panel select {
             width: 100%;
             padding: 8px;
             margin-bottom: 12px;
             border-radius: 4px;
             border: 1px solid #ccc;
         }
-        .search-panel button {
-            background-color: #007bff;
-            color: white;
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-group button {
+            flex: 1;
+            padding: 10px;
             border: none;
+            border-radius: 4px;
+            color: white;
             cursor: pointer;
         }
-        .search-panel button:hover {
-            background-color: #0056b3;
+        #search-btn { background-color: #007bff; }
+        #search-btn:hover { background-color: #0056b3; }
+        #graph-btn { background-color: #28a745; }
+        #graph-btn:hover { background-color: #218838; }
+
+        .tabs {
+            margin-top: 20px;
         }
-        #search-result {
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .tab-buttons button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background-color: #ccc;
+            cursor: pointer;
+        }
+        .tab-buttons button.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        #search-result, #chart-container {
             background-color: #fff;
             padding: 16px;
             border-radius: 8px;
             box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
-            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #ccc;
+            text-align: left;
+        }
+        th {
+            cursor: pointer;
+            background-color: #eaeaea;
+        }
+        .pagination {
+            margin-top: 16px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        .pagination button {
+            padding: 6px 12px;
+            cursor: pointer;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 <div class="header">
@@ -65,168 +121,254 @@
 <div class="search-panel">
     <label for="start-date">Start Date:</label>
     <input type="date" id="start-date" value="2024-01-01" />
-
     <label for="end-date">End Date:</label>
     <input type="date" id="end-date" />
-
     <label for="mq-function">MQ Function:</label>
     <select id="mq-function">
         <option value="">-- Loading MQ Functions... --</option>
     </select>
-
     <label for="system-name">System Name:</label>
     <select id="system-name">
         <option value="">-- Select MQ Function First --</option>
     </select>
-
-    <button id="search-btn">Search</button>
+    <div class="btn-group">
+        <button id="search-btn">Search</button>
+        <button id="graph-btn">Generate Graph</button>
+    </div>
 </div>
 
-<div id="search-result"></div>
+<div class="tabs">
+    <div class="tab-buttons">
+        <button id="tab-search" class="active">Search Result</button>
+        <button id="tab-graph">Graph</button>
+    </div>
+    <div id="tab-search-content" class="tab-content active">
+        <div id="search-result"></div>
+        <div class="pagination" id="pagination"></div>
+    </div>
+    <div id="tab-graph-content" class="tab-content">
+        <div id="chart-container">
+            <canvas id="chart" height="300"></canvas>
+        </div>
+    </div>
+</div>
 
 <script>
-    // ✅ Set Default End Date to Today
+    let tableData = [];
+    let currentPage = 1;
+    const rowsPerPage = 100;
+    let sortColumn = '';
+    let sortAsc = true;
+    let chartInstance = null;
+
+    // Set Default End Date
     document.addEventListener('DOMContentLoaded', () => {
         const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const dd = String(today.getDate()).padStart(2, '0');
-        document.getElementById('end-date').value = `${yyyy}-${mm}-${dd}`;
+        document.getElementById('end-date').value = today.toISOString().split('T')[0];
         loadMqFunctions();
     });
 
-    // 🔐 Token Validation
+    // Token Validation
+    const token = localStorage.getItem('access_token');
     function isTokenExpired(token) {
         if (!token) return true;
         try {
             const payload = JSON.parse(atob(token.split('.')[1]));
             return payload.exp < Math.floor(Date.now() / 1000);
-        } catch (e) {
-            return true;
-        }
+        } catch (e) { return true; }
     }
-
-    const token = localStorage.getItem('access_token');
     if (!token || isTokenExpired(token)) {
         localStorage.removeItem('access_token');
         window.location.href = "/login.html";
     }
-
-    // 🔐 Logout
-    document.getElementById('logout-btn').addEventListener('click', () => {
+    document.getElementById('logout-btn').onclick = () => {
         localStorage.removeItem('access_token');
         window.location.href = "/login.html";
-    });
+    };
 
-    // Load MQ Functions
     async function loadMqFunctions() {
-        const mqFunctionSelect = document.getElementById('mq-function');
+        const sel = document.getElementById('mq-function');
         try {
-            const response = await fetch('/api/v1/mq/functions', {
+            const res = await fetch('/api/v1/mq/functions', {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            const result = await response.json();
-            if (response.ok && result.success && result.data) {
-                mqFunctionSelect.innerHTML =
-                    '<option value="">-- Select MQ Function --</option>';
-                result.data.forEach((func) => {
+            const result = await res.json();
+            if (res.ok && result.success && result.data) {
+                sel.innerHTML = '<option value="">-- Select MQ Function --</option>';
+                result.data.forEach(f => {
                     const opt = document.createElement('option');
-                    opt.value = func;
-                    opt.textContent = func;
-                    mqFunctionSelect.appendChild(opt);
+                    opt.value = f; opt.textContent = f;
+                    sel.appendChild(opt);
                 });
-            } else {
-                throw new Error(result.message || "Failed to load MQ functions");
             }
         } catch (err) {
-            console.error("Error loading MQ functions:", err.message);
+            console.error("Load MQ function error:", err);
         }
     }
 
-    // Load Systems
-    async function loadSystemNamesForFunction(functionName) {
-        const systemNameSelect = document.getElementById('system-name');
-        if (!functionName) {
-            systemNameSelect.innerHTML =
-                '<option value="">-- Select MQ Function First --</option>';
+    async function loadSystemNames(funcName) {
+        const sel = document.getElementById('system-name');
+        if (!funcName) {
+            sel.innerHTML = '<option value="">-- Select MQ Function First --</option>';
             return;
         }
-
         try {
-            const response = await fetch(`/api/v1/mq/${functionName}/systems`, {
+            const res = await fetch(`/api/v1/mq/${funcName}/systems`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            const result = await response.json();
-            if (response.ok && result.success && result.data) {
-                systemNameSelect.innerHTML =
-                    '<option value="">-- Select System Name --</option>';
-                result.data.forEach((sys) => {
+            const result = await res.json();
+            if (res.ok && result.success && result.data) {
+                sel.innerHTML = '<option value="">-- Select System Name --</option>';
+                result.data.forEach(s => {
                     const opt = document.createElement('option');
-                    opt.value = sys;
-                    opt.textContent = sys;
-                    systemNameSelect.appendChild(opt);
+                    opt.value = s; opt.textContent = s;
+                    sel.appendChild(opt);
                 });
-            } else {
-                throw new Error(result.message || "Failed to load systems");
             }
         } catch (err) {
-            console.error("Error loading systems:", err.message);
-            systemNameSelect.innerHTML =
-                '<option value="">-- Failed to load systems --</option>';
+            console.error("Load systems error:", err);
         }
     }
-
-    document.getElementById('mq-function').addEventListener('change', (e) => {
-        const selectedFunction = e.target.value;
-        loadSystemNamesForFunction(selectedFunction);
+    document.getElementById('mq-function').addEventListener('change', e => {
+        loadSystemNames(e.target.value);
     });
 
-    // Convert to ISO with time for API
-    function buildIsoDatetime(dateStr, isStart) {
+    function buildIso(dateStr, isStart) {
         if (!dateStr) return null;
-        const timePart = isStart ? "00:00:00+07:00" : "23:59:59+07:00";
-        return `${dateStr}T${timePart}`;
+        return `${dateStr}T${isStart ? '00:00:00' : '23:59:59'}+07:00`;
     }
 
-    document.getElementById('search-btn').addEventListener('click', async () => {
+    async function performSearch() {
         const startDate = document.getElementById('start-date').value;
         const endDate = document.getElementById('end-date').value;
-        const mqFunction = document.getElementById('mq-function').value;
-        const systemName = document.getElementById('system-name').value;
-
+        const func = document.getElementById('mq-function').value;
+        const sys = document.getElementById('system-name').value;
         const payload = {
-            from_datetime: buildIsoDatetime(startDate, true),
-            to_datetime: buildIsoDatetime(endDate, false),
-            mq_function_name: mqFunction,
+            from_datetime: buildIso(startDate, true),
+            to_datetime: buildIso(endDate, false),
+            mq_function_name: func,
         };
-        if (systemName !== "") {
-            payload.system_name = systemName;
-        }
-
-        console.log("Search Payload:", payload);
+        if (sys) payload.system_name = sys;
 
         try {
-            const response = await fetch('/api/v1/mq/search', {
+            const res = await fetch('/api/v1/mq/search', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(payload)
             });
-
-            const result = await response.json();
-            if (response.ok && result.success && result.data) {
-                document.getElementById('search-result').innerHTML =
-                    `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+            const result = await res.json();
+            if (res.ok && result.success && result.data) {
+                tableData = result.data;
+                currentPage = 1;
+                renderTable(); renderPagination();
+                return true;
             } else {
-                document.getElementById('search-result').textContent =
-                    "Search failed: " + (result.message || "Unknown error");
+                document.getElementById('search-result').innerHTML = `<p>Search failed: ${result.message || "Unknown error"}</p>`;
+                return false;
             }
         } catch (err) {
-            document.getElementById('search-result').textContent =
-                "Search error: " + err.message;
+            document.getElementById('search-result').innerHTML = `<p>Search error: ${err.message}</p>`;
+            return false;
         }
+    }
+
+    document.getElementById('search-btn').addEventListener('click', performSearch);
+
+    function renderTable() {
+        let data = [...tableData];
+        if (sortColumn) {
+            data.sort((a, b) => sortAsc ? (a[sortColumn] > b[sortColumn]) - (a[sortColumn] < b[sortColumn])
+                : (b[sortColumn] > a[sortColumn]) - (b[sortColumn] < a[sortColumn]));
+        }
+        const start = (currentPage - 1) * rowsPerPage;
+        const rows = data.slice(start, start + rowsPerPage);
+        if (!rows.length) return document.getElementById('search-result').innerHTML = "<p>No data</p>";
+        let html = `<table><thead><tr>`;
+        Object.keys(rows[0]).forEach(c => html += `<th onclick="sortByColumn('${c}')">${c}</th>`);
+        html += `</tr></thead><tbody>`;
+        rows.forEach(r => {
+            html += `<tr>${Object.values(r).map(v => `<td>${v}</td>`).join('')}</tr>`;
+        });
+        html += `</tbody></table>`;
+        document.getElementById('search-result').innerHTML = html;
+    }
+
+    function renderPagination() {
+        const pages = Math.ceil(tableData.length / rowsPerPage);
+        let html = "";
+        for (let i = 1; i <= pages; i++) {
+            html += `<button onclick="goToPage(${i})"${i === currentPage ? ' disabled' : ''}>${i}</button>`;
+        }
+        document.getElementById('pagination').innerHTML = html;
+    }
+
+    function goToPage(p) { currentPage = p; renderTable(); renderPagination(); }
+    function sortByColumn(c) { sortAsc = sortColumn === c ? !sortAsc : true; sortColumn = c; renderTable(); }
+
+    window.goToPage = goToPage;
+    window.sortByColumn = sortByColumn;
+
+    // Graph generation
+    function getGroupKey(start, end, dtStr) {
+        const startDt = new Date(start), endDt = new Date(end), range = (endDt - startDt)/(1000*60*60*24);
+        const dt = new Date(dtStr);
+        if (range <= 7) return dt.toISOString().split('T')[0];
+        else if (range <= 60) {
+            const week = Math.ceil((((dt - new Date(dt.getFullYear(), 0, 1)) / 86400000) + new Date(dt.getFullYear(), 0, 1).getDay() + 1) / 7);
+            return `${dt.getFullYear()}-W${week}`;
+        } else return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+    }
+
+    document.getElementById('graph-btn').addEventListener('click', async () => {
+        if (!tableData.length) {
+            const ok = await performSearch();
+            if (!ok) return;
+        }
+        const start = document.getElementById('start-date').value;
+        const end = document.getElementById('end-date').value;
+        const group = {};
+        tableData.forEach(row => {
+            const key = getGroupKey(start, end, row.date_time);
+            group[key] = (group[key] || 0) + row.trans_per_sec;
+        });
+        const labels = Object.keys(group).sort();
+        const values = labels.map(l => group[l]);
+
+        const ctx = document.getElementById('chart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{ label: 'Total Trans/sec', data: values, borderWidth: 2, borderColor: 'rgba(75,192,192,1)', fill: false, tension: 0.3 }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Date Group' } },
+                    y: { title: { display: true, text: 'Total Trans/sec' }, beginAtZero: true }
+                }
+            }
+        });
+    });
+
+    // Tab control
+    document.getElementById('tab-search').addEventListener('click', () => {
+        document.getElementById('tab-search').classList.add('active');
+        document.getElementById('tab-graph').classList.remove('active');
+        document.getElementById('tab-search-content').classList.add('active');
+        document.getElementById('tab-graph-content').classList.remove('active');
+    });
+    document.getElementById('tab-graph').addEventListener('click', async () => {
+        document.getElementById('tab-graph').classList.add('active');
+        document.getElementById('tab-search').classList.remove('active');
+        document.getElementById('tab-graph-content').classList.add('active');
+        document.getElementById('tab-search-content').classList.remove('active');
+        if (!tableData.length) await performSearch();
+        document.getElementById('graph-btn').click();
     });
 </script>
 </body>
