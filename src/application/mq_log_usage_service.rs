@@ -50,14 +50,14 @@ pub async fn get_mq_log_tps_summary(
     system_name: Option<&str>,
 ) -> Result<Vec<MQLogUsage>, Box<dyn std::error::Error>> {
     debug!(
-        "get_mq_log_usage: start_date: {}, end_date: {}, mq_function: {}",
+        "get_mq_log_tps_summary : start_date: {}, end_date: {}, mq_function: {}",
         start_date, end_date, mq_function
     );
 
     let mut params = vec![mq_function];
     let mut sql = format!("SELECT date_time , SUM(trans_per_sec) AS total_trans_per_sec FROM {} WHERE mq_function = ?1", MQ_USAGE_TABLE);
 
-    sql.push_str(" AND date_time BETWEEN ?2 AND ?3");
+    sql.push_str(" AND (date_time BETWEEN ?2 AND ?3) GROUP BY date_time");
 
     let start_date_str = start_date.to_rfc3339();
     let end_date_str = end_date.to_rfc3339();
@@ -90,6 +90,7 @@ pub async fn get_mq_log_tps_summary(
             trans_per_sec,
         });
     }
+    //debug!("get_mq_log_tps_summary : mq_log_usage_list: {:?}", mq_log_usage_list);
     Ok(mq_log_usage_list)
 }
 pub async fn get_mq_log_usage(
@@ -106,7 +107,7 @@ pub async fn get_mq_log_usage(
     let mut params = vec![mq_function];
     let mut sql = format!("SELECT * FROM {} WHERE mq_function = ?1", MQ_USAGE_TABLE);
 
-    sql.push_str(" AND date_time BETWEEN ?2 AND ?3");
+    sql.push_str(" AND (date_time BETWEEN ?2 AND ?3) ");
 
     let start_date_str = start_date.to_rfc3339();
     let end_date_str = end_date.to_rfc3339();
