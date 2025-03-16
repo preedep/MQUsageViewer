@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let secret_value = std::env::var("SECRET_VALUE").expect("SECRET_VALUE must be set");
     let salt_key = std::env::var("SALT_KEY").expect("SALT_KEY must be set");
 
-    let connection = rusqlite::Connection::open("datasets/mqdata.db")?;
+    let connection = rusqlite::Connection::open("datasets/mqdata.db").expect("Failed to open database");
     let app_state = infrastructure::app_state::AppState {
         db: Arc::new(Mutex::new(connection)),
         user_name,
