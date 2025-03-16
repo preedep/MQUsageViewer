@@ -36,9 +36,6 @@ COPY --from=builder /app/target/release/mqusageviewer /app/mqusageviewer
 
 # Copy static files (HTML, CSS, JS)
 COPY ./statics ./statics
-COPY ./statics/index.html ./index.html
-COPY ./statics/login.html ./login.html
-
 # Copy dataset (SQLite DB file)
 COPY ./datasets/mqdata.db ./datasets/mqdata.db
 
