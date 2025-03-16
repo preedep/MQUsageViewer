@@ -96,6 +96,7 @@ function buildIso(dateStr, isStart) {
 
 // Perform Search
 async function performSearch() {
+    showLoading();
     const startDate = document.getElementById('start-date').value;
     const endDate = document.getElementById('end-date').value;
     const func = document.getElementById('mq-function').value;
@@ -105,6 +106,12 @@ async function performSearch() {
         to_datetime: buildIso(endDate, false),
         mq_function_name: func,
     };
+    if (!func) {
+        alert("Please select an MQ Function before proceeding.");
+        hideLoading();
+        return false;
+    }
+
     if (sys) payload.system_name = sys;
 
     try {
@@ -117,6 +124,7 @@ async function performSearch() {
             body: JSON.stringify(payload)
         });
         const result = await res.json();
+        hideLoading();
         if (res.ok && result.success && result.data) {
             tableData = result.data;
             currentPage = 1;
@@ -129,6 +137,7 @@ async function performSearch() {
             return false;
         }
     } catch (err) {
+        hideLoading();
         document.getElementById('search-result').innerHTML = `<p>Search error: ${err.message}</p>`;
         return false;
     }
@@ -258,10 +267,20 @@ async function loadSummaryDataForGraph() {
     }
 }
 
-// Render Graph
 document.getElementById('graph-btn').addEventListener('click', async () => {
     setActiveTab('graph');
+    showLoading();
+
+    const func = document.getElementById('mq-function').value;
+    if (!func) {
+        alert("Please select an MQ Function before generating the graph.");
+        hideLoading();
+        return;
+    }
+
     const summaryData = await loadSummaryDataForGraph();
+    hideLoading();
+
     if (!summaryData.length) return;
 
     const labels = summaryData.map(row => {
@@ -275,8 +294,6 @@ document.getElementById('graph-btn').addEventListener('click', async () => {
     });
 
     const values = summaryData.map(row => row.trans_per_sec);
-
-    console.log(labels, values);
 
     const xAxisLabel = getSmartGroupKey(
         document.getElementById('start-date').value,
@@ -340,4 +357,12 @@ function setActiveTab(tabName) {
     document.getElementById('tab-graph').classList.toggle('active', tabName === 'graph');
     document.getElementById('tab-search-content').classList.toggle('active', tabName === 'search');
     document.getElementById('tab-graph-content').classList.toggle('active', tabName === 'graph');
+}
+
+function showLoading() {
+    document.getElementById('loading-overlay').style.display = 'block';
+}
+
+function hideLoading() {
+    document.getElementById('loading-overlay').style.display = 'none';
 }
