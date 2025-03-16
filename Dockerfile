@@ -2,7 +2,7 @@
 FROM rust:1.85-alpine AS builder
 
 # Install required build tools
-RUN apk add --no-cache musl-dev openssl-dev pkgconfig build-base
+RUN apk add --no-cache musl-dev openssl-dev pkgconfig build-base cmake
 
 # Set working directory
 WORKDIR /app
@@ -26,7 +26,7 @@ RUN cargo build --release && strip target/release/mqusageviewer
 FROM alpine:3.19
 
 # Install runtime deps
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates sqlite-libs
 
 # Set working directory
 WORKDIR /app
