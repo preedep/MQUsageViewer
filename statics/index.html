@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>MQ Usage Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="header">
+    <h1>MQ Usage Dashboard</h1>
+    <button id="logout-btn">Logout</button>
+</div>
+
+<div class="search-panel">
+    <label for="start-date">Start Date:</label>
+    <input type="date" id="start-date" value="2024-01-01" />
+    <label for="end-date">End Date:</label>
+    <input type="date" id="end-date" />
+    <label for="mq-function">MQ Function:</label>
+    <select id="mq-function">
+        <option value="">-- Loading MQ Functions... --</option>
+    </select>
+    <label for="system-name">System Name:</label>
+    <select id="system-name">
+        <option value="">-- Select MQ Function First --</option>
+    </select>
+    <label for="grouping">Group By:</label>
+    <select id="grouping">
+        <option value="auto" selected>Auto</option>
+        <option value="15min">15-Min Interval</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+    </select>
+    <div class="btn-group">
+        <button id="search-btn">Search</button>
+        <button id="graph-btn">Generate Graph</button>
+    </div>
+</div>
+
+<div class="tabs">
+    <div class="tab-buttons">
+        <button id="tab-search" class="active">Search Result</button>
+        <button id="tab-graph">Graph</button>
+    </div>
+    <div id="tab-search-content" class="tab-content active">
+        <div id="search-result"></div>
+        <div class="pagination" id="pagination"></div>
+    </div>
+    <div id="tab-graph-content" class="tab-content">
+        <div id="chart-container">
+            <canvas id="chart" height="300"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="js/scripts.js"></script>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" style="
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(255, 255, 255, 0.8);
+    text-align: center;
+    padding-top: 40vh;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #333;">
+    Loading, please wait...
+</div>
+</body>
+</html>
