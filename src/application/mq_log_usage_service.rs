@@ -57,7 +57,7 @@ pub async fn get_mq_log_tps_summary(
     let mut params = vec![mq_function];
     let mut sql = format!("SELECT date_time , SUM(trans_per_sec) AS total_trans_per_sec FROM {} WHERE mq_function = ?1", MQ_USAGE_TABLE);
 
-    sql.push_str(" AND (date_time BETWEEN ?2 AND ?3) GROUP BY date_time");
+    sql.push_str(" AND (date_time BETWEEN ?2 AND ?3)");
 
     let start_date_str = start_date.to_rfc3339();
     let end_date_str = end_date.to_rfc3339();
@@ -69,6 +69,8 @@ pub async fn get_mq_log_tps_summary(
         sql.push_str(" AND system_name = ?4");
         params.push(system_name);
     }
+
+    sql.push_str(" GROUP BY date_time");
 
     let params: Vec<&dyn ToSql> = params.iter().map(|s| s as &dyn ToSql).collect();
 
