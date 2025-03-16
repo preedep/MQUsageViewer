@@ -1,5 +1,5 @@
 # -------- STAGE 1: Build with Rust and musl for static binary --------
-FROM rust:1.76-alpine as builder
+FROM rust:1.85-alpine as builder
 
 # Install required build tools
 RUN apk add --no-cache musl-dev openssl-dev pkgconfig build-base

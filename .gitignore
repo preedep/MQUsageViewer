@@ -29,3 +29,5 @@ target/
 /mqdata.db
 /.env
 /run.sh
+/build_docker.sh
+/run_docker.sh
