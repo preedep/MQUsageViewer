@@ -14,14 +14,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
     dotenv::dotenv().ok();
 
-    info!("Starting MQ Usage Viewer (Demo) on http://localhost:8080");
+    let port: u16 = std::env::var("PORT")
+        .unwrap_or_else(|_| "8888".to_string())
+        .parse()
+        .expect("PORT must be a number");
+
+    let message = format!("Starting MQ Usage Viewer (Demo) on http://localhost:{}", port);
+    info!("{}", message);
 
     let user_name = std::env::var("USER_NAME").expect("USER_NAME must be set");
     let password = std::env::var("PASSWORD").expect("PASSWORD must be set");
     let secret_value = std::env::var("SECRET_VALUE").expect("SECRET_VALUE must be set");
     let salt_key = std::env::var("SALT_KEY").expect("SALT_KEY must be set");
 
-    let connection = rusqlite::Connection::open("datasets/mqdata.db")?;
+    let connection = rusqlite::Connection::open("datasets/mqdata.db").expect("Failed to open database");
     let app_state = infrastructure::app_state::AppState {
         db: Arc::new(Mutex::new(connection)),
         user_name,
