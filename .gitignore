@@ -28,3 +28,4 @@ target/
 /datasets/mqdata.db
 /mqdata.db
 /.env
+/run.sh
