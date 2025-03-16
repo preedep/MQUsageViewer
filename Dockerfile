@@ -40,9 +40,7 @@ COPY ./statics ./statics
 # Copy dataset (SQLite DB file)
 COPY ./datasets/mqdata.db ./datasets/mqdata.db
 
-# Expose port (change if needed)
+ENV PORT=8888
 EXPOSE 8888
-
-ENV RUST_LOG=debug
 # Run binary
 CMD ["./mqusageviewer"]

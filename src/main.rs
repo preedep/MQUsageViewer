@@ -14,7 +14,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
     dotenv::dotenv().ok();
 
-    info!("Starting MQ Usage Viewer (Demo) on http://localhost:8888");
+    let port: u16 = std::env::var("PORT")
+        .unwrap_or_else(|_| "8888".to_string())
+        .parse()
+        .expect("PORT must be a number");
+
+    let message = format!("Starting MQ Usage Viewer (Demo) on http://localhost:{}", port);
+    info!("{}", message);
 
     let user_name = std::env::var("USER_NAME").expect("USER_NAME must be set");
     let password = std::env::var("PASSWORD").expect("PASSWORD must be set");
