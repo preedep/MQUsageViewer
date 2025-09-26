@@ -174,7 +174,16 @@ function renderTable() {
     columns.forEach(c => html += `<th onclick="sortByColumn('${c}')">${c}</th>`);
     html += `</tr></thead><tbody>`;
     rows.forEach(r => {
-        html += `<tr>` + columns.map(c => `<td>${r[c] !== undefined ? r[c] : ''}</td>`).join('') + `</tr>`;
+        html += `<tr>` + columns.map(c => {
+            if (c === 'work_total' && r[c] !== undefined && r[c] !== null && r[c] !== '') {
+                let raw = String(r[c]).replace(/,/g, '').trim();
+                let num = Number(raw);
+                console.log('work_total raw:', r[c], 'parsed:', num, 'formatted:', !isNaN(num) ? num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : r[c]);
+                return `<td>${!isNaN(num) ? num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : r[c]}</td>`;
+            } else {
+                return `<td>${r[c] !== undefined ? r[c] : ''}</td>`;
+            }
+        }).join('') + `</tr>`;
     });
     html += `</tbody></table>`;
     document.getElementById('search-result').innerHTML = html;
