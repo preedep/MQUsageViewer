@@ -32,3 +32,8 @@ target/
 /build_docker.sh
 /run_docker.sh
 /build_dockerhub.sh
+/.idea/copilot.data.migration.agent.xml
+/.idea/copilot.data.migration.ask.xml
+/.idea/copilot.data.migration.ask2agent.xml
+/.idea/copilot.data.migration.edit.xml
+/datasets/mqdata_v2.db

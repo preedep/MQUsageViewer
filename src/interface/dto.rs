@@ -68,6 +68,7 @@ pub struct SearchMqLogResponse {
     pub date_time: DateTime<Local>,
     pub system_name: String,
     pub mq_function: String,
+    pub work_total: f64,
     pub trans_per_sec: f64,
 }
 
@@ -78,6 +79,7 @@ impl From<MQLogUsage> for SearchMqLogResponse {
             date_time: item.date_time,
             system_name: item.system_name,
             mq_function: item.mq_function,
+            work_total: item.work_total,
             trans_per_sec: item.trans_per_sec,
         }
     }

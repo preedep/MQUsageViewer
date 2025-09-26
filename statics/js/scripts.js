@@ -155,11 +155,26 @@ function renderTable() {
     const start = (currentPage - 1) * rowsPerPage;
     const rows = data.slice(start, start + rowsPerPage);
     if (!rows.length) return document.getElementById('search-result').innerHTML = "<p>No data</p>";
+
+    // กำหนดลำดับ columns ที่ต้องการ
+    const columns = (() => {
+        const keys = Object.keys(rows[0]);
+        let cols = [...keys];
+        // ถ้ามี work_total และ trans_per_sec ให้จัดลำดับใหม่
+        if (cols.includes('work_total') && cols.includes('trans_per_sec')) {
+            cols = cols.filter(c => c !== 'work_total' && c !== 'trans_per_sec');
+            const idx = keys.indexOf('trans_per_sec');
+            // ใส่ work_total ก่อน trans_per_sec
+            cols.splice(idx > 0 ? idx - 1 : 0, 0, 'work_total', 'trans_per_sec');
+        }
+        return cols;
+    })();
+
     let html = `<table><thead><tr>`;
-    Object.keys(rows[0]).forEach(c => html += `<th onclick="sortByColumn('${c}')">${c}</th>`);
+    columns.forEach(c => html += `<th onclick="sortByColumn('${c}')">${c}</th>`);
     html += `</tr></thead><tbody>`;
     rows.forEach(r => {
-        html += `<tr>${Object.values(r).map(v => `<td>${v}</td>`).join('')}</tr>`;
+        html += `<tr>` + columns.map(c => `<td>${r[c] !== undefined ? r[c] : ''}</td>`).join('') + `</tr>`;
     });
     html += `</tbody></table>`;
     document.getElementById('search-result').innerHTML = html;
