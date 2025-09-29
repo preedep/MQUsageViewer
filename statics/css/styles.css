@@ -101,3 +101,27 @@ th {
     padding: 6px 12px;
     cursor: pointer;
 }
+
+/* Checkbox group styling for horizontal layout */
+.search-panel .checkbox-group {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+.search-panel .checkbox-group input[type="checkbox"] {
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    flex-shrink: 0;
+}
+
+.search-panel .checkbox-group label {
+    display: inline-block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-weight: bold;
+    white-space: nowrap;
+}
