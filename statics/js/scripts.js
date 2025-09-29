@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('end-date').value = today.toISOString().split('T')[0];
     checkTokenAndRedirect();
     loadMqFunctions();
+    setupAggregateToggle();
 });
 
 // Token Handling
@@ -88,6 +89,50 @@ document.getElementById('mq-function').addEventListener('change', e => {
     loadSystemNames(e.target.value);
 });
 
+// Aggregate Toggle: when checked, disable mq-function & system-name, and disable Search button
+function setupAggregateToggle() {
+    const chk = document.getElementById('all-funcs');
+    const mqSel = document.getElementById('mq-function');
+    const sysSel = document.getElementById('system-name');
+    const searchBtn = document.getElementById('search-btn');
+    const graphBtn = document.getElementById('graph-btn');
+
+    if (!chk || !mqSel || !sysSel || !searchBtn || !graphBtn) {
+        console.error('Some elements not found for aggregate toggle');
+        return;
+    }
+
+    const applyState = () => {
+        const on = chk.checked;
+        console.log('Aggregate mode:', on);
+        
+        mqSel.disabled = on;
+        sysSel.disabled = on;
+        searchBtn.disabled = on;
+        
+        // Add visual styling for disabled state
+        if (on) {
+            mqSel.style.opacity = '0.5';
+            sysSel.style.opacity = '0.5';
+            searchBtn.style.opacity = '0.5';
+            searchBtn.style.cursor = 'not-allowed';
+            mqSel.value = '';
+            sysSel.value = '';
+        } else {
+            mqSel.style.opacity = '1';
+            sysSel.style.opacity = '1';
+            searchBtn.style.opacity = '1';
+            searchBtn.style.cursor = 'pointer';
+        }
+        
+        // Graph is always enabled
+        graphBtn.disabled = false;
+    };
+    
+    chk.addEventListener('change', applyState);
+    applyState(); // Apply initial state
+}
+
 // Build ISO String
 function buildIso(dateStr, isStart) {
     if (!dateStr) return null;
@@ -101,6 +146,12 @@ async function performSearch() {
     const endDate = document.getElementById('end-date').value;
     const func = document.getElementById('mq-function').value;
     const sys = document.getElementById('system-name').value;
+    const aggregate = document.getElementById('all-funcs')?.checked;
+    if (aggregate) {
+        // In aggregate mode, standard search is disabled by UI; add guard.
+        hideLoading();
+        return false;
+    }
     const payload = {
         from_datetime: buildIso(startDate, true),
         to_datetime: buildIso(endDate, false),
@@ -295,6 +346,92 @@ document.getElementById('graph-btn').addEventListener('click', async () => {
     setActiveTab('graph');
     showLoading();
 
+    const aggregate = document.getElementById('all-funcs')?.checked;
+    const grouping = document.getElementById('grouping')?.value || 'monthly';
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+
+    if (aggregate) {
+        // Aggregate mode: sum work_total across all MQ functions, ignore system name
+        try {
+            // 1) fetch all functions
+            const funcsRes = await fetch('/api/v1/mq/functions', { headers: { Authorization: `Bearer ${token}` } });
+            const funcsJson = await funcsRes.json();
+            const funcs = (funcsRes.ok && funcsJson.success && Array.isArray(funcsJson.data)) ? funcsJson.data : [];
+            if (!funcs.length) {
+                hideLoading();
+                alert('No MQ Functions available to aggregate.');
+                return;
+            }
+
+            // 2) fetch search for each function in parallel
+            const from_datetime = buildIso(startDate, true);
+            const to_datetime = buildIso(endDate, false);
+            const reqs = funcs.map(f => fetch('/api/v1/mq/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ from_datetime, to_datetime, mq_function_name: f })
+            }).then(r => r.json()).catch(() => ({ success: false })));
+
+            const results = await Promise.all(reqs);
+            // 3) aggregate work_total by grouped time key
+            const bucket = new Map(); // key -> sum
+            let xAxisLabel = 'Time';
+            results.forEach(res => {
+                if (res && res.success && Array.isArray(res.data)) {
+                    res.data.forEach(row => {
+                        const g = getSmartGroupKey(startDate, endDate, row.date_time, grouping);
+                        xAxisLabel = g.label;
+                        const k = g.key;
+                        const wt = Number(String(row.work_total).replace(/,/g, '')) || 0;
+                        bucket.set(k, (bucket.get(k) || 0) + wt);
+                    });
+                }
+            });
+
+            const labels = Array.from(bucket.keys()).sort();
+            const values = labels.map(k => bucket.get(k) || 0);
+            const maxValue = values.length ? Math.max(...values) : 0;
+
+            const ctx = document.getElementById('chart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Work Total Summary (All MQ Functions)',
+                        data: values,
+                        borderColor: 'rgba(40,167,69,1)',
+                        backgroundColor: 'rgba(40,167,69,0.2)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: true },
+                        title: { display: true, text: 'Work Total (Aggregated)', font: { size: 20 } }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: xAxisLabel, font: { size: 16 } }, ticks: { autoSkip: true, maxTicksLimit: 20 } },
+                        y: { beginAtZero: true, suggestedMax: maxValue * 1.1, title: { display: true, text: 'Work Total', font: { size: 16 } } }
+                    }
+                }
+            });
+            hideLoading();
+            return;
+        } catch (e) {
+            console.error('Aggregate graph error:', e);
+            hideLoading();
+            alert('Failed to generate aggregate graph.');
+            return;
+        }
+    }
+
+    // Default (non-aggregate) behavior: TPS summary for selected mq-function/system
     const func = document.getElementById('mq-function').value;
     if (!func) {
         alert("Please select an MQ Function before generating the graph.");
