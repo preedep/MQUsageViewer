@@ -4,7 +4,8 @@ use crate::interface::dto::{ApiResponse, SearchMqLogRequest, SearchMqLogResponse
 use actix_web::http::StatusCode;
 use actix_web::{get, post, web};
 use log::{debug, error};
-use rusqlite::fallible_iterator::FallibleIterator;
+use redis;
+use serde_json;
 
 #[get("/mq/{function}/systems")]
 pub async fn mq_function_systems(app_state: web::Data<AppState>,
@@ -19,14 +20,41 @@ pub async fn mq_function_systems(app_state: web::Data<AppState>,
         ),
     }
 }
+
 #[get("/mq/functions")]
 pub async fn mq_functions(app_state: web::Data<AppState>) -> impl actix_web::Responder {
-    // Lock the database mutex to get a Connection
+    // สร้าง key สำหรับ cache
+    let cache_key = "mq_functions";
+    // ถ้ามี redis client ให้ลองดึงจาก cache ก่อน
+    if let Some(ref redis_client) = app_state.redis_client {
+        if let Ok(mut con) = redis_client.get_connection() {
+            let cached: redis::RedisResult<String> = redis::cmd("GET").arg(cache_key).query(&mut con);
+            if let Ok(json_str) = cached {
+                if let Ok(result) = serde_json::from_str::<Vec<String>>(&json_str) {
+                    debug!("Cache hit: {}", cache_key);
+                    return ApiResponse::<Vec<String>>::success("Success (cache)", Some(result));
+                }else {
+                    error!("Error: {}", json_str);
+                }
+            }else{
+                error!("Redis error: {}", cached.unwrap_err());
+            }
+        }else {
+            error!("Redis not available. Continue without cache.");
+        }
+    }
+    // ถ้าไม่มีใน cache หรือ redis error ให้ query db แล้ว cache ผลลัพธ์
     let connection = app_state.db.lock().unwrap();
-
-    // Call the correct get_mq_functions function (disambiguated)
     match get_mq_function_list(&connection).await {
-        Ok(result) => ApiResponse::<Vec<String>>::success("Success", Some(result)),
+        Ok(result) => {
+            // cache ลง redis ถ้าใช้ได้
+            if let Some(ref redis_client) = app_state.redis_client {
+                if let Ok(mut con) = redis_client.get_connection() {
+                    let _ = redis::cmd("SET").arg(cache_key).arg(serde_json::to_string(&result).unwrap_or_default()).query::<()>(&mut con);
+                }
+            }
+            ApiResponse::<Vec<String>>::success("Success", Some(result))
+        },
         Err(e) => ApiResponse::<Vec<String>>::error(
             &format!("Error: {}", e),
             StatusCode::INTERNAL_SERVER_ERROR,
