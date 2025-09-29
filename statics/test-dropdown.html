@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Searchable Dropdown</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div style="padding: 20px; max-width: 600px; margin: 0 auto;">
+        <h1>Test Searchable Dropdown</h1>
+        
+        <div style="margin-bottom: 20px;">
+            <label>MQ Function (Searchable):</label>
+            <div id="test-dropdown-1"></div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label>System Name (Searchable):</label>
+            <div id="test-dropdown-2"></div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <button id="get-values">Get Selected Values</button>
+            <button id="clear-all">Clear All</button>
+        </div>
+        
+        <div id="output" style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 20px;">
+            <strong>Selected Values:</strong><br>
+            <span id="values">None selected</span>
+        </div>
+    </div>
+
+    <script src="js/searchable-select.js"></script>
+    <script>
+        // Test data
+        const mqFunctions = [
+            'MQPUT_Function_A',
+            'MQGET_Function_B', 
+            'MQPUT_Function_C',
+            'MQGET_Function_D',
+            'MQINQ_Function_E',
+            'MQSET_Function_F',
+            'MQOPEN_Function_G',
+            'MQCLOSE_Function_H',
+            'MQCMIT_Function_I',
+            'MQBACK_Function_J'
+        ];
+        
+        const systemNames = [
+            'System_Alpha',
+            'System_Beta',
+            'System_Gamma',
+            'System_Delta',
+            'System_Epsilon',
+            'System_Zeta',
+            'System_Eta',
+            'System_Theta'
+        ];
+
+        // Initialize searchable dropdowns
+        const dropdown1 = new SearchableSelect('test-dropdown-1', {
+            placeholder: 'Search and select MQ Function...',
+            onSelect: (value, text) => {
+                console.log('MQ Function selected:', value, text);
+                updateOutput();
+            }
+        });
+
+        const dropdown2 = new SearchableSelect('test-dropdown-2', {
+            placeholder: 'Search and select System Name...',
+            onSelect: (value, text) => {
+                console.log('System Name selected:', value, text);
+                updateOutput();
+            }
+        });
+
+        // Set test data
+        dropdown1.setData(mqFunctions);
+        dropdown2.setData(systemNames);
+
+        // Event handlers
+        document.getElementById('get-values').addEventListener('click', () => {
+            updateOutput();
+        });
+
+        document.getElementById('clear-all').addEventListener('click', () => {
+            dropdown1.clear();
+            dropdown2.clear();
+            updateOutput();
+        });
+
+        function updateOutput() {
+            const value1 = dropdown1.getValue();
+            const text1 = dropdown1.getText();
+            const value2 = dropdown2.getValue();
+            const text2 = dropdown2.getText();
+            
+            document.getElementById('values').innerHTML = `
+                MQ Function: ${value1 || 'None'} (${text1 || 'None'})<br>
+                System Name: ${value2 || 'None'} (${text2 || 'None'})
+            `;
+        }
+
+        // Initial output
+        updateOutput();
+    </script>
+</body>
+</html>
