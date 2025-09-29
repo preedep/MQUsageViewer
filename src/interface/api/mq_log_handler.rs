@@ -1,4 +1,4 @@
-use crate::application::mq_log_usage_service::{get_mq_function_list, get_mq_log_tps_summary, get_mq_log_usage, get_system_name_list};
+use crate::application::mq_log_usage_service::{get_all_mq_log_tps_summary, get_mq_function_list, get_mq_log_tps_summary, get_mq_log_usage, get_system_name_list};
 use crate::infrastructure::app_state::AppState;
 use crate::interface::dto::{ApiResponse, SearchMqLogRequest, SearchMqLogResponse};
 use actix_web::http::StatusCode;
@@ -115,6 +115,50 @@ pub async fn mq_tps_summary(
     }
 }
 
+#[post("/mq/tps/all_summary")]
+pub async fn all_mq_tps_summary(
+    app_state: web::Data<AppState>,
+    data: web::Json<SearchMqLogRequest>,
+) -> impl actix_web::Responder {
+    let connection = app_state.db.lock().unwrap();
+    debug!(
+        "all_mq_tps_summary: start_date: {}, end_date: {}",
+        data.0.from_datetime,
+        data.0.to_datetime
+    );
+
+    let start_date = data.0.from_datetime;
+    let end_date = data.0.to_datetime;
+
+    let result = get_all_mq_log_tps_summary(
+        &connection,
+        &start_date,
+        &end_date,
+    )
+    .await;
+
+    match result {
+        Ok(result) => {
+            let result = result
+                .into_iter()
+                .map(SearchMqLogResponse::from)
+                .collect::<Vec<_>>();
+            ApiResponse::<Vec<SearchMqLogResponse>>::success("Success", Some(result))
+        }
+        Err(e) => {
+            let message = format!("Error: {}", e.to_string());
+            error!(
+                "all_mq_tps_summary: Error: {}",
+                e.to_string()
+            );
+
+            ApiResponse::<Vec<SearchMqLogResponse>>::error(
+                &message,
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )
+        }
+    }
+}
 #[post("/mq/search")]
 pub async fn mq_search(
     app_state: web::Data<AppState>,

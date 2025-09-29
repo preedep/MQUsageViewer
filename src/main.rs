@@ -66,6 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .service(interface::api::mq_log_handler::mq_search)
                     .service(interface::api::mq_log_handler::mq_functions)
                     .service(interface::api::mq_log_handler::mq_tps_summary)
+                    .service(interface::api::mq_log_handler::all_mq_tps_summary)
                     .service(interface::api::mq_log_handler::mq_function_systems),
             )
             .service(Files::new("/", "./statics").index_file("index.html"))

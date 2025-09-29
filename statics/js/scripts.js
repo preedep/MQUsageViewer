@@ -352,46 +352,47 @@ document.getElementById('graph-btn').addEventListener('click', async () => {
     const endDate = document.getElementById('end-date').value;
 
     if (aggregate) {
-        // Aggregate mode: sum work_total across all MQ functions, ignore system name
+        // Aggregate mode: use /api/v1/mq/tps/all_summary to get aggregated TPS data
         try {
-            // 1) fetch all functions
-            const funcsRes = await fetch('/api/v1/mq/functions', { headers: { Authorization: `Bearer ${token}` } });
-            const funcsJson = await funcsRes.json();
-            const funcs = (funcsRes.ok && funcsJson.success && Array.isArray(funcsJson.data)) ? funcsJson.data : [];
-            if (!funcs.length) {
-                hideLoading();
-                alert('No MQ Functions available to aggregate.');
+            const from_datetime = buildIso(startDate, true);
+            const to_datetime = buildIso(endDate, false);
+            
+            const res = await fetch('/api/v1/mq/tps/all_summary', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    from_datetime,
+                    to_datetime,
+                    mq_function_name: "" // Not used by all_summary endpoint
+                })
+            });
+            
+            const result = await res.json();
+            hideLoading();
+            
+            if (!res.ok || !result.success || !Array.isArray(result.data) || !result.data.length) {
+                alert('No aggregate TPS data available for the selected time range.');
                 return;
             }
 
-            // 2) fetch search for each function in parallel
-            const from_datetime = buildIso(startDate, true);
-            const to_datetime = buildIso(endDate, false);
-            const reqs = funcs.map(f => fetch('/api/v1/mq/search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ from_datetime, to_datetime, mq_function_name: f })
-            }).then(r => r.json()).catch(() => ({ success: false })));
-
-            const results = await Promise.all(reqs);
-            // 3) aggregate work_total by grouped time key
-            const bucket = new Map(); // key -> sum
-            let xAxisLabel = 'Time';
-            results.forEach(res => {
-                if (res && res.success && Array.isArray(res.data)) {
-                    res.data.forEach(row => {
-                        const g = getSmartGroupKey(startDate, endDate, row.date_time, grouping);
-                        xAxisLabel = g.label;
-                        const k = g.key;
-                        const wt = Number(String(row.work_total).replace(/,/g, '')) || 0;
-                        bucket.set(k, (bucket.get(k) || 0) + wt);
-                    });
-                }
+            const summaryData = result.data;
+            const labels = summaryData.map(row => {
+                const { key } = getSmartGroupKey(startDate, endDate, row.date_time, grouping);
+                return key;
             });
 
-            const labels = Array.from(bucket.keys()).sort();
-            const values = labels.map(k => bucket.get(k) || 0);
+            const values = summaryData.map(row => row.trans_per_sec);
             const maxValue = values.length ? Math.max(...values) : 0;
+
+            const xAxisLabel = getSmartGroupKey(
+                startDate,
+                endDate,
+                summaryData[0]?.date_time,
+                grouping
+            ).label;
 
             const ctx = document.getElementById('chart').getContext('2d');
             if (chartInstance) chartInstance.destroy();
@@ -400,7 +401,7 @@ document.getElementById('graph-btn').addEventListener('click', async () => {
                 data: {
                     labels,
                     datasets: [{
-                        label: 'Work Total Summary (All MQ Functions)',
+                        label: 'TPS Summary (All MQ Functions)',
                         data: values,
                         borderColor: 'rgba(40,167,69,1)',
                         backgroundColor: 'rgba(40,167,69,0.2)',
@@ -413,20 +414,19 @@ document.getElementById('graph-btn').addEventListener('click', async () => {
                     responsive: true,
                     plugins: {
                         legend: { display: true },
-                        title: { display: true, text: 'Work Total (Aggregated)', font: { size: 20 } }
+                        title: { display: true, text: 'TPS Summary (All MQ Functions)', font: { size: 20 } }
                     },
                     scales: {
                         x: { title: { display: true, text: xAxisLabel, font: { size: 16 } }, ticks: { autoSkip: true, maxTicksLimit: 20 } },
-                        y: { beginAtZero: true, suggestedMax: maxValue * 1.1, title: { display: true, text: 'Work Total', font: { size: 16 } } }
+                        y: { beginAtZero: true, suggestedMax: maxValue * 1.1, title: { display: true, text: 'Transactions per Second (TPS)', font: { size: 16 } } }
                     }
                 }
             });
-            hideLoading();
             return;
         } catch (e) {
-            console.error('Aggregate graph error:', e);
+            console.error('Aggregate TPS graph error:', e);
             hideLoading();
-            alert('Failed to generate aggregate graph.');
+            alert('Failed to generate aggregate TPS graph.');
             return;
         }
     }

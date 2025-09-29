@@ -42,6 +42,49 @@ pub async fn get_mq_function_list(
     }
     Ok(mq_functions)
 }
+
+pub async fn get_all_mq_log_tps_summary(
+    connection: &rusqlite::Connection,
+    start_date: &DateTime<Local>,
+    end_date: &DateTime<Local>, 
+) -> Result<Vec<MQLogUsage>, Box<dyn std::error::Error>>
+{
+    debug!(
+        "get_all_mq_log_tps_summary: start_date: {}, end_date: {}",
+        start_date, end_date
+    );
+
+    let sql = format!(
+        "SELECT date_time, SUM(trans_per_sec) AS total_trans_per_sec FROM {} WHERE (date_time BETWEEN ?1 AND ?2) GROUP BY date_time ORDER BY date_time",
+        MQ_USAGE_TABLE
+    );
+
+    let start_date_str = start_date.to_rfc3339();
+    let end_date_str = end_date.to_rfc3339();
+
+    let params: Vec<&dyn ToSql> = vec![&start_date_str, &end_date_str];
+
+    let mut stmt = connection.prepare(&sql)?;
+    let mut rows = stmt.query(params.as_slice())?;
+    let mut mq_log_usage_list = Vec::new();
+
+    while let Some(row) = rows.next()? {
+        let date_time: DateTime<Local> = row.get(0)?;
+        let trans_per_sec: f64 = row.get(1)?;
+        mq_log_usage_list.push(MQLogUsage {
+            date_time,
+            date: "".to_string(),
+            minute: "".to_string(),
+            system_name: "".to_string(),
+            mq_function: "".to_string(),
+            work_total: 0.0,
+            trans_per_sec,
+        });
+    }
+    
+    Ok(mq_log_usage_list)
+}
+    
 pub async fn get_mq_log_tps_summary(
     connection: &rusqlite::Connection,
     start_date: &DateTime<Local>,
