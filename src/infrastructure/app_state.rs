@@ -1,5 +1,6 @@
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
+use redis::Client;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -8,4 +9,5 @@ pub struct AppState {
     pub password: String,
     pub secret_value: String,
     pub salt_key: String,
+    pub redis_client: Option<redis::Client>,
 }

@@ -1,8 +1,9 @@
 use crate::infrastructure::middleware::auth_middleware::AuthMiddleware;
 use actix_files::Files;
 use actix_web::{App, HttpServer, web};
-use log::info;
+use log::{error, info};
 use std::sync::{Arc, Mutex};
+use redis::Client as RedisClient;
 
 mod application;
 mod domain;
@@ -28,12 +29,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let salt_key = std::env::var("SALT_KEY").expect("SALT_KEY must be set");
 
     let connection = rusqlite::Connection::open("datasets/mqdata_v2.db").expect("Failed to open database");
+
+    let redis_client = match std::env::var("REDIS_URL") {
+        Ok(redis_url) => match RedisClient::open(redis_url) {
+            Ok(client) => {
+                info!("Connected to Redis cache");
+                Some(client)
+            },
+            Err(e) => {
+                error!("Redis not available: {}. Continue without cache.", e);
+                None
+            }
+        },
+        Err(_) => {
+            error!("REDIS_URL not set. Continue without cache.");
+            None
+        }
+    };
+
     let app_state = infrastructure::app_state::AppState {
         db: Arc::new(Mutex::new(connection)),
         user_name,
         password,
         secret_value,
         salt_key,
+        redis_client,
     };
     HttpServer::new(move || {
         App::new()
