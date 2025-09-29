@@ -6,6 +6,10 @@ class MQDashboard {
         this.tableManager = new TableManager();
         this.chartManager = new ChartManager(this.apiService);
         
+        // Initialize searchable dropdowns
+        this.mqFunctionSelect = null;
+        this.systemNameSelect = null;
+        
         this.init();
     }
 
@@ -16,6 +20,7 @@ class MQDashboard {
         
         // Initialize components
         this.authManager.checkTokenAndRedirect();
+        this.initializeSearchableDropdowns();
         this.loadMqFunctions();
         this.setupAggregateToggle();
         this.setupEventListeners();
@@ -24,14 +29,24 @@ class MQDashboard {
         window.tableManager = this.tableManager;
     }
 
+    initializeSearchableDropdowns() {
+        // Initialize MQ Function searchable dropdown
+        this.mqFunctionSelect = new SearchableSelect('mq-function-container', {
+            placeholder: 'Loading MQ Functions...',
+            onSelect: (value, text) => {
+                this.loadSystemNames(value);
+            }
+        });
+
+        // Initialize System Name searchable dropdown
+        this.systemNameSelect = new SearchableSelect('system-name-container', {
+            placeholder: 'Select MQ Function First',
+        });
+    }
+
     setupEventListeners() {
         // Logout button
         document.getElementById('logout-btn').onclick = () => this.authManager.logout();
-        
-        // MQ Function change
-        document.getElementById('mq-function').addEventListener('change', e => {
-            this.loadSystemNames(e.target.value);
-        });
         
         // Search button
         document.getElementById('search-btn').addEventListener('click', () => this.performSearch());
@@ -48,40 +63,45 @@ class MQDashboard {
     }
 
     async loadMqFunctions() {
-        const sel = document.getElementById('mq-function');
-        const functions = await this.apiService.fetchMqFunctions();
-        
-        sel.innerHTML = '<option value="">-- Select MQ Function --</option>';
-        functions.forEach(f => {
-            const opt = document.createElement('option');
-            opt.value = f;
-            opt.textContent = f;
-            sel.appendChild(opt);
-        });
+        this.mqFunctionSelect.setLoading(true);
+        try {
+            const functions = await this.apiService.fetchMqFunctions();
+            const data = functions.map(f => ({ value: f, text: f }));
+            this.mqFunctionSelect.setData(data);
+            this.mqFunctionSelect.setPlaceholder('Select MQ Function...');
+        } catch (error) {
+            console.error('Error loading MQ functions:', error);
+            this.mqFunctionSelect.setPlaceholder('Error loading functions');
+        } finally {
+            this.mqFunctionSelect.setLoading(false);
+        }
     }
 
     async loadSystemNames(funcName) {
-        const sel = document.getElementById('system-name');
         if (!funcName) {
-            sel.innerHTML = '<option value="">-- Select MQ Function First --</option>';
+            this.systemNameSelect.clear();
+            this.systemNameSelect.setPlaceholder('Select MQ Function First');
+            this.systemNameSelect.setData([]);
             return;
         }
         
-        const systems = await this.apiService.fetchSystemNames(funcName);
-        sel.innerHTML = '<option value="">-- Select System Name --</option>';
-        systems.forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s;
-            opt.textContent = s;
-            sel.appendChild(opt);
-        });
+        this.systemNameSelect.setLoading(true);
+        try {
+            const systems = await this.apiService.fetchSystemNames(funcName);
+            const data = systems.map(s => ({ value: s, text: s }));
+            this.systemNameSelect.setData(data);
+            this.systemNameSelect.setPlaceholder('Select System Name...');
+        } catch (error) {
+            console.error('Error loading system names:', error);
+            this.systemNameSelect.setPlaceholder('Error loading systems');
+        } finally {
+            this.systemNameSelect.setLoading(false);
+        }
     }
 
     setupAggregateToggle() {
         const elements = {
             chk: document.getElementById('all-funcs'),
-            mqSel: document.getElementById('mq-function'),
-            sysSel: document.getElementById('system-name'),
             searchBtn: document.getElementById('search-btn'),
             graphBtn: document.getElementById('graph-btn')
         };
@@ -95,18 +115,23 @@ class MQDashboard {
             const on = elements.chk.checked;
             console.log('Aggregate mode:', on);
             
-            [elements.mqSel, elements.sysSel, elements.searchBtn].forEach(el => {
-                el.disabled = on;
-                el.style.opacity = on ? '0.5' : '1';
-            });
-            
-            elements.searchBtn.style.cursor = on ? 'not-allowed' : 'pointer';
-            
+            // Disable/enable searchable dropdowns
             if (on) {
-                elements.mqSel.value = '';
-                elements.sysSel.value = '';
+                this.mqFunctionSelect.disable();
+                this.systemNameSelect.disable();
+                this.mqFunctionSelect.clear();
+                this.systemNameSelect.clear();
+            } else {
+                this.mqFunctionSelect.enable();
+                this.systemNameSelect.enable();
             }
             
+            // Disable/enable search button
+            elements.searchBtn.disabled = on;
+            elements.searchBtn.style.opacity = on ? '0.5' : '1';
+            elements.searchBtn.style.cursor = on ? 'not-allowed' : 'pointer';
+            
+            // Graph button always enabled
             elements.graphBtn.disabled = false;
         };
         
@@ -183,8 +208,8 @@ class MQDashboard {
         return {
             startDate: document.getElementById('start-date').value,
             endDate: document.getElementById('end-date').value,
-            func: document.getElementById('mq-function').value,
-            sys: document.getElementById('system-name').value,
+            func: this.mqFunctionSelect.getValue(),
+            sys: this.systemNameSelect.getValue(),
             grouping: document.getElementById('grouping')?.value || 'monthly'
         };
     }
