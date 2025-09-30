@@ -47,6 +47,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    // Check if Entra ID authentication is enabled
+    let use_entra_id = std::env::var("USE_ENTRA_ID")
+        .unwrap_or_else(|_| "false".to_string())
+        .parse::<bool>()
+        .unwrap_or(false);
+
     let app_state = infrastructure::app_state::AppState {
         db: Arc::new(Mutex::new(connection)),
         user_name,
@@ -56,6 +62,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         redis_client,
     };
     HttpServer::new(move || {
+        let default_login_page = if use_entra_id {
+            "login_entra_id.html"
+        } else {
+            "login.html"
+        };
+
         App::new()
             .wrap(actix_web::middleware::Logger::default())
             .app_data(web::Data::new(app_state.clone()))
@@ -69,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .service(interface::api::mq_log_handler::all_mq_tps_summary)
                     .service(interface::api::mq_log_handler::mq_function_systems),
             )
-            .service(Files::new("/", "./statics").index_file("index.html"))
+            .service(Files::new("/", "./statics").index_file(default_login_page))
     })
     .bind(("0.0.0.0", 8888))?
     .run()

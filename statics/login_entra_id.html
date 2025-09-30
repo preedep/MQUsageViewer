@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQ Usage Viewer - Login</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+    <style>
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        .login-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .login-subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .entra-login-btn {
+            background: #0078d4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .entra-login-btn:hover {
+            background: #106ebe;
+        }
+        
+        .entra-login-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .microsoft-logo {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            color: #d32f2f;
+            margin-top: 15px;
+            padding: 10px;
+            background: #ffebee;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .app-info {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-title">MQ Usage Viewer</div>
+            <div class="login-subtitle">Sign in to access the dashboard</div>
+            
+            <button id="loginBtn" class="entra-login-btn">
+                <svg class="microsoft-logo" viewBox="0 0 23 23" fill="currentColor">
+                    <path d="M1 1h10v10H1V1zm11 0h10v10H12V1zM1 12h10v10H1V12zm11 0h10v10H12V12z"/>
+                </svg>
+                <span id="loginText">Sign in with Microsoft</span>
+                <div id="loadingSpinner" class="loading-spinner"></div>
+            </button>
+            
+            <div id="errorMessage" class="error-message"></div>
+            
+            <div class="app-info">
+                <p>Secure access to MQ transaction monitoring and analytics</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // MSAL Configuration
+        const msalConfig = {
+            auth: {
+                clientId: "YOUR_CLIENT_ID", // Replace with your Azure App Registration Client ID
+                authority: "https://login.microsoftonline.com/YOUR_TENANT_ID", // Replace with your tenant ID
+                redirectUri: window.location.origin + "/index.html" // Redirect to main app after login
+            },
+            cache: {
+                cacheLocation: "sessionStorage",
+                storeAuthStateInCookie: false
+            }
+        };
+
+        // Login Request Configuration
+        const loginRequest = {
+            scopes: ["User.Read"]
+        };
+
+        // Initialize MSAL
+        const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+        // DOM Elements
+        const loginBtn = document.getElementById('loginBtn');
+        const loginText = document.getElementById('loginText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Check if user is already logged in
+        window.addEventListener('load', async () => {
+            try {
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length > 0) {
+                    // User is already logged in, redirect to main app
+                    window.location.href = '/index.html';
+                }
+            } catch (error) {
+                console.error('Error checking login status:', error);
+            }
+        });
+
+        // Login function
+        async function login() {
+            try {
+                showLoading(true);
+                hideError();
+
+                const loginResponse = await msalInstance.loginPopup(loginRequest);
+                
+                if (loginResponse) {
+                    // Store user info in session storage for the main app
+                    sessionStorage.setItem('userAccount', JSON.stringify(loginResponse.account));
+                    
+                    // Redirect to main application
+                    window.location.href = '/index.html';
+                }
+            } catch (error) {
+                console.error('Login failed:', error);
+                showError('Login failed. Please try again.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Utility functions
+        function showLoading(isLoading) {
+            if (isLoading) {
+                loginBtn.disabled = true;
+                loginText.textContent = 'Signing in...';
+                loadingSpinner.style.display = 'block';
+            } else {
+                loginBtn.disabled = false;
+                loginText.textContent = 'Sign in with Microsoft';
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        // Event listeners
+        loginBtn.addEventListener('click', login);
+
+        // Handle redirect response (if using redirect instead of popup)
+        msalInstance.handleRedirectPromise().then((response) => {
+            if (response) {
+                sessionStorage.setItem('userAccount', JSON.stringify(response.account));
+                window.location.href = '/index.html';
+            }
+        }).catch((error) => {
+            console.error('Redirect handling error:', error);
+            showError('Authentication error. Please try again.');
+        });
+    </script>
+</body>
+</html>
