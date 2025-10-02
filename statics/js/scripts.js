@@ -161,6 +161,12 @@ class MQDashboard {
         };
         if (formData.sys) payload.system_name = formData.sys;
 
+        console.log('=== performSearch() Debug ===');
+        console.log('Form data received:', formData);
+        console.log('Built ISO start date:', Utils.buildIso(formData.startDate, true));
+        console.log('Built ISO end date:', Utils.buildIso(formData.endDate, false));
+        console.log('Final payload to API:', payload);
+
         const result = await this.apiService.searchMqData(payload);
         Utils.hideLoading();
         
@@ -205,12 +211,25 @@ class MQDashboard {
     }
 
     getFormData() {
+        const startDate = document.getElementById('start-date').value;
+        const endDate = document.getElementById('end-date').value;
+        const func = this.mqFunctionSelect.getValue();
+        const sys = this.systemNameSelect.getValue();
+        const grouping = document.getElementById('grouping')?.value || 'monthly';
+        
+        console.log('=== getFormData() Debug ===');
+        console.log('Start Date from input:', startDate);
+        console.log('End Date from input:', endDate);
+        console.log('MQ Function:', func);
+        console.log('System Name:', sys);
+        console.log('Grouping:', grouping);
+        
         return {
-            startDate: document.getElementById('start-date').value,
-            endDate: document.getElementById('end-date').value,
-            func: this.mqFunctionSelect.getValue(),
-            sys: this.systemNameSelect.getValue(),
-            grouping: document.getElementById('grouping')?.value || 'monthly'
+            startDate,
+            endDate,
+            func,
+            sys,
+            grouping
         };
     }
 

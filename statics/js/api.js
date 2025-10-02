@@ -33,6 +33,10 @@ class ApiService {
 
     async searchMqData(payload) {
         try {
+            console.log('=== API searchMqData() Debug ===');
+            console.log('Payload received by API service:', payload);
+            console.log('JSON stringified payload:', JSON.stringify(payload));
+            
             const res = await fetch('/api/v1/mq/search', {
                 method: 'POST',
                 headers: this.auth.getAuthHeaders(),
