@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Interval Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; }
+        select, button { margin: 5px; padding: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Time Interval Averaging Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Configuration</h2>
+        <label>Time Interval:</label>
+        <select id="time-interval">
+            <option value="15">15 Minutes (Default)</option>
+            <option value="30" selected>30 Minutes</option>
+            <option value="60">1 Hour</option>
+            <option value="120">2 Hours</option>
+        </select>
+        
+        <button onclick="testTimeInterval()">Test Time Interval</button>
+        
+        <div id="test-result" class="result">
+            Click "Test Time Interval" to see the selected interval value.
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>API Payload Preview</h2>
+        <div id="payload-preview" class="result">
+            Select a time interval and click test to see the API payload structure.
+        </div>
+    </div>
+
+    <script>
+        function testTimeInterval() {
+            const timeInterval = parseInt(document.getElementById('time-interval').value);
+            const resultDiv = document.getElementById('test-result');
+            const payloadDiv = document.getElementById('payload-preview');
+            
+            // Test the time interval selection
+            resultDiv.innerHTML = `
+                <strong>Selected Time Interval:</strong> ${timeInterval} minutes<br>
+                <strong>Status:</strong> ${timeInterval === 15 ? 'Using default database intervals' : 'Using custom averaging'}
+            `;
+            
+            // Show example API payload
+            const examplePayload = {
+                from_datetime: "2024-01-01T00:00:00+07:00",
+                to_datetime: "2024-01-02T00:00:00+07:00",
+                mq_function_name: "TEST_FUNCTION",
+                system_name: "TEST_SYSTEM",
+                time_interval_minutes: timeInterval
+            };
+            
+            payloadDiv.innerHTML = `
+                <strong>Example API Payload:</strong><br>
+                <pre>${JSON.stringify(examplePayload, null, 2)}</pre>
+            `;
+        }
+        
+        // Test on page load
+        window.onload = function() {
+            testTimeInterval();
+        };
+    </script>
+</body>
+</html>

@@ -18,12 +18,13 @@ class ChartManager {
         return this.chartInstance;
     }
 
-    async generateAggregateChart(startDate, endDate, grouping) {
+    async generateAggregateChart(startDate, endDate, grouping, timeInterval) {
         try {
             const payload = {
                 from_datetime: Utils.buildIso(startDate, true),
                 to_datetime: Utils.buildIso(endDate, false),
-                mq_function_name: "" // Not used by all_summary endpoint
+                mq_function_name: "", // Not used by all_summary endpoint
+                time_interval_minutes: timeInterval
             };
 
             const result = await this.apiService.fetchAllTpsSummary(payload);
@@ -84,12 +85,13 @@ class ChartManager {
         }
     }
 
-    async generateFunctionChart(startDate, endDate, grouping, func, sys) {
+    async generateFunctionChart(startDate, endDate, grouping, func, sys, timeInterval) {
         try {
             const payload = {
                 from_datetime: Utils.buildIso(startDate, true),
                 to_datetime: Utils.buildIso(endDate, false),
                 mq_function_name: func,
+                time_interval_minutes: timeInterval
             };
             if (sys) payload.system_name = sys;
 

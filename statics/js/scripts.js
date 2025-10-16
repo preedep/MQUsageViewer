@@ -24,9 +24,26 @@ class MQDashboard {
         this.loadMqFunctions();
         this.setupAggregateToggle();
         this.setupEventListeners();
+        this.setupTimeIntervalDebug();
         
         // Make table manager globally accessible for onclick handlers
         window.tableManager = this.tableManager;
+    }
+
+    setupTimeIntervalDebug() {
+        // Debug: Check if time interval selector exists
+        const timeIntervalSelect = document.getElementById('time-interval');
+        if (timeIntervalSelect) {
+            console.log('✅ Time Interval selector found:', timeIntervalSelect);
+            console.log('Current value:', timeIntervalSelect.value);
+            
+            // Add change event listener for debugging
+            timeIntervalSelect.addEventListener('change', (e) => {
+                console.log('Time interval changed to:', e.target.value, 'minutes');
+            });
+        } else {
+            console.error('❌ Time Interval selector NOT found!');
+        }
     }
 
     initializeSearchableDropdowns() {
@@ -193,7 +210,7 @@ class MQDashboard {
         
         if (aggregate) {
             success = await this.chartManager.generateAggregateChart(
-                formData.startDate, formData.endDate, formData.grouping
+                formData.startDate, formData.endDate, formData.grouping, formData.timeInterval
             );
         } else {
             if (!formData.func) {
@@ -203,7 +220,7 @@ class MQDashboard {
             }
             success = await this.chartManager.generateFunctionChart(
                 formData.startDate, formData.endDate, formData.grouping, 
-                formData.func, formData.sys
+                formData.func, formData.sys, formData.timeInterval
             );
         }
         
@@ -216,6 +233,7 @@ class MQDashboard {
         const func = this.mqFunctionSelect.getValue();
         const sys = this.systemNameSelect.getValue();
         const grouping = document.getElementById('grouping')?.value || 'monthly';
+        const timeInterval = parseInt(document.getElementById('time-interval')?.value || '15');
         
         console.log('=== getFormData() Debug ===');
         console.log('Start Date from input:', startDate);
@@ -223,13 +241,15 @@ class MQDashboard {
         console.log('MQ Function:', func);
         console.log('System Name:', sys);
         console.log('Grouping:', grouping);
+        console.log('Time Interval:', timeInterval);
         
         return {
             startDate,
             endDate,
             func,
             sys,
-            grouping
+            grouping,
+            timeInterval
         };
     }
 

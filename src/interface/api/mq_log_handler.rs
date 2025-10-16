@@ -134,6 +134,7 @@ pub async fn mq_tps_summary(
         &data.to_datetime,
         &data.mq_function_name,
         system_name,
+        data.time_interval_minutes,
     ).await;
 
     handle_service_result(result, "mq_tps_summary")
@@ -154,6 +155,7 @@ pub async fn all_mq_tps_summary(
         &connection,
         &data.from_datetime,
         &data.to_datetime,
+        data.time_interval_minutes,
     ).await;
 
     handle_service_result(result, "all_mq_tps_summary")

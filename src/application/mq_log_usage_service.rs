@@ -46,18 +46,40 @@ pub async fn get_mq_function_list(
 pub async fn get_all_mq_log_tps_summary(
     connection: &rusqlite::Connection,
     start_date: &DateTime<Local>,
-    end_date: &DateTime<Local>, 
+    end_date: &DateTime<Local>,
+    time_interval_minutes: Option<i32>,
 ) -> Result<Vec<MQLogUsage>, Box<dyn std::error::Error>>
 {
     debug!(
-        "get_all_mq_log_tps_summary: start_date: {}, end_date: {}",
-        start_date, end_date
+        "get_all_mq_log_tps_summary: start_date: {}, end_date: {}, interval: {:?}",
+        start_date, end_date, time_interval_minutes
     );
 
-    let sql = format!(
-        "SELECT date_time, SUM(trans_per_sec) AS total_trans_per_sec FROM {} WHERE (date_time BETWEEN ?1 AND ?2) GROUP BY date_time ORDER BY date_time",
-        MQ_USAGE_TABLE
-    );
+    let interval_minutes = time_interval_minutes.unwrap_or(15); // Default to 15 minutes
+    
+    let sql = if interval_minutes == 15 {
+        // Use original query for 15-minute intervals (no aggregation needed)
+        format!(
+            "SELECT date_time, SUM(trans_per_sec) AS total_trans_per_sec FROM {} WHERE (date_time BETWEEN ?1 AND ?2) GROUP BY date_time ORDER BY date_time",
+            MQ_USAGE_TABLE
+        )
+    } else {
+        // For other intervals, group by time intervals
+        format!(
+            "SELECT 
+                datetime(
+                    strftime('%Y-%m-%d %H:', date_time) || 
+                    printf('%02d', (CAST(strftime('%M', date_time) AS INTEGER) / {}) * {}) || 
+                    ':00'
+                ) AS interval_time,
+                AVG(trans_per_sec) AS avg_trans_per_sec
+            FROM {} 
+            WHERE (date_time BETWEEN ?1 AND ?2) 
+            GROUP BY interval_time 
+            ORDER BY interval_time",
+            interval_minutes, interval_minutes, MQ_USAGE_TABLE
+        )
+    };
 
     let start_date_str = start_date.to_rfc3339();
     let end_date_str = end_date.to_rfc3339();
@@ -91,29 +113,58 @@ pub async fn get_mq_log_tps_summary(
     end_date: &DateTime<Local>,
     mq_function: &str,
     system_name: Option<&str>,
+    time_interval_minutes: Option<i32>,
 ) -> Result<Vec<MQLogUsage>, Box<dyn std::error::Error>> {
     debug!(
-        "get_mq_log_tps_summary : start_date: {}, end_date: {}, mq_function: {}",
-        start_date, end_date, mq_function
+        "get_mq_log_tps_summary : start_date: {}, end_date: {}, mq_function: {}, interval: {:?}",
+        start_date, end_date, mq_function, time_interval_minutes
     );
 
-    let mut params = vec![mq_function];
-    let mut sql = format!("SELECT date_time , SUM(trans_per_sec) AS total_trans_per_sec FROM {} WHERE mq_function = ?1", MQ_USAGE_TABLE);
-
-    sql.push_str(" AND (date_time BETWEEN ?2 AND ?3)");
-
+    let interval_minutes = time_interval_minutes.unwrap_or(15); // Default to 15 minutes
     let start_date_str = start_date.to_rfc3339();
     let end_date_str = end_date.to_rfc3339();
 
+    let mut params = vec![mq_function];
     params.push(&start_date_str);
     params.push(&end_date_str);
 
-    if let Some(system_name) = system_name {
-        sql.push_str(" AND system_name = ?4");
-        params.push(system_name);
-    }
-
-    sql.push_str(" GROUP BY date_time");
+    let sql = if interval_minutes == 15 {
+        // Use original query for 15-minute intervals
+        let mut base_sql = format!(
+            "SELECT date_time, SUM(trans_per_sec) AS total_trans_per_sec FROM {} WHERE mq_function = ?1 AND (date_time BETWEEN ?2 AND ?3)",
+            MQ_USAGE_TABLE
+        );
+        
+        if let Some(system_name) = system_name {
+            base_sql.push_str(" AND system_name = ?4");
+            params.push(system_name);
+        }
+        
+        base_sql.push_str(" GROUP BY date_time ORDER BY date_time");
+        base_sql
+    } else {
+        // For other intervals, group by time intervals
+        let mut base_sql = format!(
+            "SELECT 
+                datetime(
+                    strftime('%Y-%m-%d %H:', date_time) || 
+                    printf('%02d', (CAST(strftime('%M', date_time) AS INTEGER) / {}) * {}) || 
+                    ':00'
+                ) AS interval_time,
+                AVG(trans_per_sec) AS avg_trans_per_sec
+            FROM {} 
+            WHERE mq_function = ?1 AND (date_time BETWEEN ?2 AND ?3)",
+            interval_minutes, interval_minutes, MQ_USAGE_TABLE
+        );
+        
+        if let Some(system_name) = system_name {
+            base_sql.push_str(" AND system_name = ?4");
+            params.push(system_name);
+        }
+        
+        base_sql.push_str(" GROUP BY interval_time ORDER BY interval_time");
+        base_sql
+    };
 
     let params: Vec<&dyn ToSql> = params.iter().map(|s| s as &dyn ToSql).collect();
 

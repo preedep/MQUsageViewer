@@ -9,15 +9,15 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <!-- CSS and JS with cache busting -->
-    <link rel="stylesheet" href="css/styles.css?v=1.0" />
+    <link rel="stylesheet" href="css/styles.css?v=1.2&t=20241016" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Load modules in dependency order -->
-    <script src="js/utils.js?v=1.0"></script>
-    <script src="js/auth.js?v=1.0"></script>
-    <script src="js/api.js?v=1.0"></script>
-    <script src="js/searchable-select.js?v=1.0"></script>
-    <script src="js/table.js?v=1.0"></script>
-    <script src="js/chart.js?v=1.0"></script>
+    <script src="js/utils.js?v=1.2&t=20241016"></script>
+    <script src="js/auth.js?v=1.2&t=20241016"></script>
+    <script src="js/api.js?v=1.2&t=20241016"></script>
+    <script src="js/searchable-select.js?v=1.2&t=20241016"></script>
+    <script src="js/table.js?v=1.2&t=20241016"></script>
+    <script src="js/chart.js?v=1.2&t=20241016"></script>
 </head>
 <body>
 <div class="header">
@@ -39,6 +39,14 @@
     <div id="mq-function-container"></div>
     <label for="system-name">System Name:</label>
     <div id="system-name-container"></div>
+    <label for="time-interval">⏱️ Time Interval (ช่วงเวลาเฉลี่ย):</label>
+    <select id="time-interval" style="background-color: #e3f2fd; border: 2px solid #2196f3; font-weight: bold;">
+        <option value="15" selected>15 นาที (Default)</option>
+        <option value="30">30 นาที ⭐</option>
+        <option value="60">1 ชั่วโมง</option>
+        <option value="120">2 ชั่วโมง</option>
+        <option value="240">4 ชั่วโมง</option>
+    </select>
     <label for="grouping">Group By:</label>
     <select id="grouping">
         <option value="auto" selected>Auto</option>
@@ -69,7 +77,7 @@
     </div>
 </div>
 
-<script src="js/scripts.js?v=1.0"></script>
+<script src="js/scripts.js?v=1.2&t=20241016"></script>
 
 <!-- Loading Overlay -->
 <div id="loading-overlay" style="
