@@ -18,8 +18,37 @@ class ChartManager {
         return this.chartInstance;
     }
 
+    // Helper function to get month key from date string
+    _getMonthKey(dateStr) {
+        const date = new Date(dateStr);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    // Process data to get monthly peaks
+    _getMonthlyPeaks(data, dateKey = 'date_time', valueKey = 'trans_per_sec') {
+        const monthlyPeaks = new Map();
+        
+        data.forEach(item => {
+            const monthKey = this._getMonthKey(item[dateKey]);
+            const currentValue = parseFloat(item[valueKey]);
+            
+            if (!monthlyPeaks.has(monthKey) || currentValue > monthlyPeaks.get(monthKey).value) {
+                monthlyPeaks.set(monthKey, {
+                    date: item[dateKey],
+                    value: currentValue,
+                    label: new Date(item[dateKey]).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                });
+            }
+        });
+        
+        // Convert map to array and sort by date
+        return Array.from(monthlyPeaks.values())
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
     async generateAggregateChart(startDate, endDate, grouping, timeInterval) {
         try {
+            const showPeaks = document.getElementById('show-peaks').checked;
             const payload = {
                 from_datetime: Utils.buildIso(startDate, true),
                 to_datetime: Utils.buildIso(endDate, false),
@@ -34,13 +63,22 @@ class ChartManager {
                 return false;
             }
 
-            const summaryData = result.data;
-            const labels = summaryData.map(row => {
-                const { key } = Utils.getSmartGroupKey(startDate, endDate, row.date_time, grouping);
-                return key;
-            });
+            let summaryData = result.data;
+            let labels, values;
 
-            const values = summaryData.map(row => row.trans_per_sec);
+            if (showPeaks) {
+                const peaks = this._getMonthlyPeaks(summaryData);
+                labels = peaks.map(peak => peak.label);
+                values = peaks.map(peak => peak.value);
+                grouping = 'monthly'; // Force monthly grouping for peaks
+            } else {
+                labels = summaryData.map(row => {
+                    const { key } = Utils.getSmartGroupKey(startDate, endDate, row.date_time, grouping);
+                    return key;
+                });
+                values = summaryData.map(row => row.trans_per_sec);
+            }
+            
             const maxValue = values.length ? Math.max(...values) : 0;
 
             const xAxisLabel = Utils.getSmartGroupKey(
@@ -69,11 +107,57 @@ class ChartManager {
                     responsive: true,
                     plugins: {
                         legend: { display: true },
-                        title: { display: true, text: 'TPS Summary (All MQ Functions)', font: { size: 20 } }
+                        title: { 
+                            display: true, 
+                            text: 'TPS Summary (All MQ Functions)', 
+                            font: { size: 20 } 
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y;
+                                    const date = showPeaks 
+                                        ? new Date(summaryData.find(d => d.trans_per_sec === value)?.date_time)
+                                        : new Date(summaryData[context.dataIndex]?.date_time);
+                                    const formattedDate = date ? date.toLocaleString('th-TH', {
+                                        year: 'numeric',
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    }) : '';
+                                    return `${label}: ${value} TPS\n${formattedDate}`;
+                                }
+                            }
+                        }
                     },
                     scales: {
-                        x: { title: { display: true, text: xAxisLabel, font: { size: 16 } }, ticks: { autoSkip: true, maxTicksLimit: 20 } },
-                        y: { beginAtZero: true, suggestedMax: maxValue * 1.1, title: { display: true, text: 'Transactions per Second (TPS)', font: { size: 16 } } }
+                        x: { 
+                            title: { 
+                                display: true, 
+                                text: xAxisLabel, 
+                                font: { size: 16 } 
+                            }, 
+                            ticks: { 
+                                autoSkip: true, 
+                                maxTicksLimit: 20 
+                            } 
+                        },
+                        y: { 
+                            beginAtZero: true, 
+                            suggestedMax: maxValue * 1.1, 
+                            title: { 
+                                display: true, 
+                                text: 'Transactions per Second (TPS)', 
+                                font: { size: 16 } 
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString('en-US');
+                                }
+                            }
+                        }
                     }
                 }
             });
@@ -87,6 +171,7 @@ class ChartManager {
 
     async generateFunctionChart(startDate, endDate, grouping, func, sys, timeInterval) {
         try {
+            const showPeaks = document.getElementById('show-peaks').checked;
             const payload = {
                 from_datetime: Utils.buildIso(startDate, true),
                 to_datetime: Utils.buildIso(endDate, false),
@@ -95,20 +180,29 @@ class ChartManager {
             };
             if (sys) payload.system_name = sys;
 
-            const summaryData = await this.apiService.fetchTpsSummary(payload);
+            let summaryData = await this.apiService.fetchTpsSummary(payload);
             
             if (!summaryData.length) {
                 alert('No TPS data available for the selected function and time range.');
                 return false;
             }
 
-            const labels = summaryData.map(row => {
-                const { key } = Utils.getSmartGroupKey(startDate, endDate, row.date_time, grouping);
-                return key;
-            });
+            let labels, values;
 
-            const values = summaryData.map(row => row.trans_per_sec);
-            const maxValue = Math.max(...values);
+            if (showPeaks) {
+                const peaks = this._getMonthlyPeaks(summaryData);
+                labels = peaks.map(peak => peak.label);
+                values = peaks.map(peak => peak.value);
+                grouping = 'monthly'; // Force monthly grouping for peaks
+            } else {
+                labels = summaryData.map(row => {
+                    const { key } = Utils.getSmartGroupKey(startDate, endDate, row.date_time, grouping);
+                    return key;
+                });
+                values = summaryData.map(row => row.trans_per_sec);
+            }
+            
+            const maxValue = values.length ? Math.max(...values) : 0;
 
             const xAxisLabel = Utils.getSmartGroupKey(
                 startDate,
@@ -140,17 +234,58 @@ class ChartManager {
                             display: true,
                             text: `TPS Summary (${func})`,
                             font: { size: 20 }
+                        },
+                        subtitle: sys ? {
+                            display: true,
+                            text: `System: ${sys}`,
+                            font: { size: 16 },
+                            padding: { bottom: 10 }
+                        } : null,
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y;
+                                    const date = showPeaks 
+                                        ? new Date(summaryData.find(d => d.trans_per_sec === value)?.date_time)
+                                        : new Date(summaryData[context.dataIndex]?.date_time);
+                                    const formattedDate = date ? date.toLocaleString('th-TH', {
+                                        year: 'numeric',
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    }) : '';
+                                    return `${label}: ${value} TPS\n${formattedDate}`;
+                                }
+                            }
                         }
                     },
                     scales: {
-                        x: {
-                            title: { display: true, text: xAxisLabel, font: { size: 16 } },
-                            ticks: { autoSkip: true, maxTicksLimit: 20 }
+                        x: { 
+                            title: { 
+                                display: true, 
+                                text: xAxisLabel, 
+                                font: { size: 16 } 
+                            }, 
+                            ticks: { 
+                                autoSkip: true, 
+                                maxTicksLimit: 20 
+                            } 
                         },
-                        y: {
-                            beginAtZero: true,
-                            suggestedMax: maxValue * 1.1,
-                            title: { display: true, text: 'Transactions per Second (TPS)', font: { size: 16 } }
+                        y: { 
+                            beginAtZero: true, 
+                            suggestedMax: maxValue * 1.1, 
+                            title: { 
+                                display: true, 
+                                text: 'Transactions per Second (TPS)', 
+                                font: { size: 16 } 
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString('en-US');
+                                }
+                            }
                         }
                     }
                 }
