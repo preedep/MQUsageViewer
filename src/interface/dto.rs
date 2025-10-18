@@ -61,6 +61,8 @@ pub struct SearchMqLogRequest {
     pub mq_function_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time_interval_minutes: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

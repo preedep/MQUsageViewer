@@ -6,7 +6,7 @@ class ApiService {
 
     async fetchMqFunctions() {
         try {
-            const res = await fetch('/api/v1/mq/functions', {
+            const res = await fetch('/api/mq/functions', {
                 headers: { Authorization: `Bearer ${this.auth.getToken()}` }
             });
             const result = await res.json();
@@ -20,7 +20,7 @@ class ApiService {
     async fetchSystemNames(funcName) {
         if (!funcName) return [];
         try {
-            const res = await fetch(`/api/v1/mq/${funcName}/systems`, {
+            const res = await fetch(`/api/mq/function/systems?mq_function_name=${encodeURIComponent(funcName)}`, {
                 headers: { Authorization: `Bearer ${this.auth.getToken()}` }
             });
             const result = await res.json();
@@ -33,7 +33,11 @@ class ApiService {
 
     async searchMqData(payload) {
         try {
-            const res = await fetch('/api/v1/mq/search', {
+            console.log('=== API searchMqData() Debug ===');
+            console.log('Payload received by API service:', payload);
+            console.log('JSON stringified payload:', JSON.stringify(payload));
+            
+            const res = await fetch('/api/mq/search', {
                 method: 'POST',
                 headers: this.auth.getAuthHeaders(),
                 body: JSON.stringify(payload)
@@ -48,13 +52,28 @@ class ApiService {
 
     async fetchTpsSummary(payload) {
         try {
-            const res = await fetch('/api/v1/mq/tps/summary', {
+            console.log('🔍 TPS Summary API Call:');
+            console.log('   📤 Payload:', JSON.stringify(payload, null, 2));
+            console.log('   🔗 URL: /api/mq/tps/summary');
+            
+            const res = await fetch('/api/mq/tps/summary', {
                 method: 'POST',
                 headers: this.auth.getAuthHeaders(),
                 body: JSON.stringify(payload)
             });
+            
+            console.log('   📥 Response Status:', res.status, res.statusText);
+            
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error('   ❌ Error Response:', errorText);
+                return [];
+            }
+            
             const result = await res.json();
-            return (res.ok && result.success && result.data) ? result.data : [];
+            console.log('   ✅ Response:', result);
+            
+            return (result.success && result.data) ? result.data : [];
         } catch (err) {
             console.error("TPS summary fetch error:", err);
             return [];
@@ -63,7 +82,7 @@ class ApiService {
 
     async fetchAllTpsSummary(payload) {
         try {
-            const res = await fetch('/api/v1/mq/tps/all_summary', {
+            const res = await fetch('/api/mq/tps/all_summary', {
                 method: 'POST',
                 headers: this.auth.getAuthHeaders(),
                 body: JSON.stringify(payload)

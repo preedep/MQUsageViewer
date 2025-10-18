@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-System Test (Standalone)</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>Multi-System Test (Standalone)</h1>
+    </div>
+
+    <div class="search-panel">
+        <h3>Test Multi-System Feature (No Backend Required)</h3>
+        
+        <label for="mq-function">MQ Function:</label>
+        <select id="mq-function">
+            <option value="">Select MQ Function...</option>
+            <option value="DebitCreditSvcRq">DebitCreditSvcRq</option>
+            <option value="BalanceInquiry">BalanceInquiry</option>
+            <option value="TransferFunds">TransferFunds</option>
+        </select>
+        
+        <div class="checkbox-group">
+            <input type="checkbox" id="aggregate-systems" />
+            <label for="aggregate-systems">Aggregate All Systems (รวมข้อมูลทุก System)</label>
+        </div>
+        
+        <div id="system-names-container" style="display: block; margin-top: 10px;">
+            <label>Select Systems to Display:</label>
+            <div id="system-names-checkboxes">
+                <div class="system-checkbox-item">
+                    <input type="checkbox" id="system-SYSTEM_A" value="SYSTEM_A" checked>
+                    <label for="system-SYSTEM_A">SYSTEM_A</label>
+                </div>
+                <div class="system-checkbox-item">
+                    <input type="checkbox" id="system-SYSTEM_B" value="SYSTEM_B" checked>
+                    <label for="system-SYSTEM_B">SYSTEM_B</label>
+                </div>
+                <div class="system-checkbox-item">
+                    <input type="checkbox" id="system-SYSTEM_C" value="SYSTEM_C" checked>
+                    <label for="system-SYSTEM_C">SYSTEM_C</label>
+                </div>
+                <div class="system-checkbox-item">
+                    <input type="checkbox" id="system-SYSTEM_D" value="SYSTEM_D" checked>
+                    <label for="system-SYSTEM_D">SYSTEM_D</label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="btn-group">
+            <button id="test-separate">Test Separate Systems (Default)</button>
+            <button id="test-aggregate">Test Aggregate Systems</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab-buttons">
+            <button id="tab-test" class="active">Test Results</button>
+        </div>
+        <div id="tab-test-content" class="tab-content active">
+            <div id="chart-container">
+                <canvas id="chart" height="400"></canvas>
+            </div>
+            <div id="test-results" style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+                <h4>Test Results:</h4>
+                <ul id="test-log"></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load chart.js -->
+    <script src="js/chart.js"></script>
+
+    <script>
+        // Standalone test script for multi-system functionality
+        class StandaloneMultiSystemTest {
+            constructor() {
+                this.chartManager = new ChartManager();
+                this.testLog = document.getElementById('test-log');
+                this.init();
+            }
+
+            init() {
+                this.setupTestButtons();
+                this.setupMockData();
+                this.log('✅ Standalone Multi-System Test initialized');
+            }
+
+            log(message) {
+                const li = document.createElement('li');
+                li.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+                this.testLog.appendChild(li);
+                console.log(message);
+            }
+
+            setupTestButtons() {
+                document.getElementById('test-separate').addEventListener('click', () => {
+                    this.testSeparateSystemsChart();
+                });
+
+                document.getElementById('test-aggregate').addEventListener('click', () => {
+                    this.testAggregateSystemsChart();
+                });
+            }
+
+            setupMockData() {
+                // Generate mock TPS data for testing
+                this.mockData = {
+                    'SYSTEM_A': this.generateMockTpsData('SYSTEM_A', 50, 150),
+                    'SYSTEM_B': this.generateMockTpsData('SYSTEM_B', 30, 120),
+                    'SYSTEM_C': this.generateMockTpsData('SYSTEM_C', 70, 200),
+                    'SYSTEM_D': this.generateMockTpsData('SYSTEM_D', 20, 80)
+                };
+                this.log('📊 Mock data generated for 4 systems');
+            }
+
+            generateMockTpsData(systemName, minTps, maxTps) {
+                const data = [];
+                const now = new Date();
+                
+                for (let i = 0; i < 24; i++) {
+                    const date = new Date(now.getTime() - (23 - i) * 60 * 60 * 1000);
+                    const tps = Math.floor(Math.random() * (maxTps - minTps) + minTps) + 
+                               Math.sin(i / 4) * 20; // Add some wave pattern
+                    
+                    data.push({
+                        date_time: date.toISOString(),
+                        trans_per_sec: Math.max(0, tps),
+                        system_name: systemName
+                    });
+                }
+                
+                return data;
+            }
+
+            getSelectedSystems() {
+                return Array.from(
+                    document.querySelectorAll('#system-names-checkboxes input[type="checkbox"]:checked')
+                ).map(cb => cb.value);
+            }
+
+            async testSeparateSystemsChart() {
+                try {
+                    this.log('🧪 Testing Separate Systems Chart (Default Behavior)...');
+                    
+                    const selectedSystems = this.getSelectedSystems();
+                    
+                    if (selectedSystems.length === 0) {
+                        this.log('❌ No systems selected. Please check some systems first.');
+                        alert('Please select at least one system to test');
+                        return;
+                    }
+                    
+                    this.log(`📈 Generating separate chart for systems: ${selectedSystems.join(', ')}`);
+                    
+                    // Test the multi-system chart generation (separate lines)
+                    const result = await this.chartManager.generateMultiSystemChart(
+                        'chart',
+                        this.mockData,
+                        selectedSystems,
+                        {
+                            title: `Multi-System TPS Comparison - Separate Lines (${selectedSystems.length} systems)`,
+                            xLabel: 'Time',
+                            yLabel: 'Transactions Per Second'
+                        }
+                    );
+                    
+                    if (result) {
+                        this.log('✅ Separate Systems Chart generated successfully!');
+                        this.log(`📊 Chart shows ${selectedSystems.length} systems with different colored lines`);
+                        this.log('🎯 This is the DEFAULT behavior - each system shows as separate line');
+                    } else {
+                        this.log('❌ Failed to generate Separate Systems Chart');
+                    }
+                    
+                } catch (error) {
+                    this.log(`❌ Error in Separate Systems Chart test: ${error.message}`);
+                    console.error('Separate Systems Chart test error:', error);
+                }
+            }
+
+            async testAggregateSystemsChart() {
+                try {
+                    this.log('🧪 Testing Aggregate Systems Chart (Sum All Systems)...');
+                    
+                    const selectedSystems = this.getSelectedSystems();
+                    
+                    if (selectedSystems.length === 0) {
+                        this.log('❌ No systems selected. Please check some systems first.');
+                        alert('Please select at least one system to test');
+                        return;
+                    }
+                    
+                    this.log(`📈 Generating aggregate chart for systems: ${selectedSystems.join(', ')}`);
+                    
+                    // Aggregate the data (sum TPS by time)
+                    const aggregatedData = this.aggregateSystemsData(selectedSystems);
+                    
+                    // Display aggregated chart
+                    const result = await this.chartManager.displayTpsChart(
+                        'chart',
+                        aggregatedData,
+                        {
+                            title: `Aggregated Systems TPS - Single Line (${selectedSystems.join(', ')})`,
+                            grouping: 'hourly'
+                        }
+                    );
+                    
+                    if (result) {
+                        this.log('✅ Aggregate Systems Chart generated successfully!');
+                        this.log(`📊 Chart shows combined data from ${selectedSystems.length} systems as single line`);
+                        this.log('🎯 This is the AGGREGATE behavior - all systems summed into one line');
+                    } else {
+                        this.log('❌ Failed to generate Aggregate Systems Chart');
+                    }
+                    
+                } catch (error) {
+                    this.log(`❌ Error in Aggregate Systems Chart test: ${error.message}`);
+                    console.error('Aggregate Systems Chart test error:', error);
+                }
+            }
+
+            aggregateSystemsData(selectedSystems) {
+                const timeGroups = new Map();
+                
+                selectedSystems.forEach(systemName => {
+                    const systemData = this.mockData[systemName] || [];
+                    
+                    systemData.forEach(item => {
+                        const timeKey = item.date_time;
+                        if (!timeGroups.has(timeKey)) {
+                            timeGroups.set(timeKey, {
+                                date_time: timeKey,
+                                trans_per_sec: 0
+                            });
+                        }
+                        
+                        const group = timeGroups.get(timeKey);
+                        group.trans_per_sec += parseFloat(item.trans_per_sec) || 0;
+                    });
+                });
+                
+                // Convert to array and sort by time
+                return Array.from(timeGroups.values())
+                    .sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
+            }
+        }
+
+        // Initialize test when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new StandaloneMultiSystemTest();
+        });
+    </script>
+</body>
+</html>

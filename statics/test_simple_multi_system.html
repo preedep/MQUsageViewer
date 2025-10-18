@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Multi-System Test</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            background-color: #f5f6fa;
+        }
+        
+        .search-panel {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        #chart-container {
+            min-height: 700px !important;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border: 1px solid #e9ecef;
+        }
+        
+        .tab-content {
+            background-color: transparent;
+        }
+        
+        #test-results {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border: 1px solid #e9ecef;
+        }
+        
+        .btn-group button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>Simple Multi-System Test</h1>
+    </div>
+
+    <div class="search-panel">
+        <h3>Test Multi-System Feature (Simplified)</h3>
+        
+        <label for="start-date">Start Date:</label>
+        <input type="date" id="start-date" value="2024-01-01" />
+        
+        <label for="end-date">End Date:</label>
+        <input type="date" id="end-date" />
+        
+        <label for="mq-function">MQ Function:</label>
+        <select id="mq-function">
+            <option value="">Select MQ Function...</option>
+            <option value="DebitCreditSvcRq" selected>DebitCreditSvcRq</option>
+            <option value="BalanceInquiry">BalanceInquiry</option>
+            <option value="TransferFunds">TransferFunds</option>
+        </select>
+        
+        <div class="checkbox-group">
+            <input type="checkbox" id="aggregate-systems" />
+            <label for="aggregate-systems">Aggregate All Systems (รวมข้อมูลทุก System)</label>
+        </div>
+        
+        <div id="system-names-container" style="display: block; margin-top: 10px;">
+            <label>Select Systems to Display:</label>
+            <div id="system-names-checkboxes">
+                <div class="system-checkbox-item">
+                    <input type="checkbox" id="system-API" value="API" checked>
+                    <label for="system-API">API</label>
+                </div>
+                <div class="system-checkbox-item">
+                    <input type="checkbox" id="system-IS_FENETM" value="IS FENETM" checked>
+                    <label for="system-IS_FENETM">IS FENETM</label>
+                </div>
+                <div class="system-checkbox-item">
+                    <input type="checkbox" id="system-PMH" value="PMH" checked>
+                    <label for="system-PMH">PMH</label>
+                </div>
+            </div>
+        </div>
+        
+        <label for="time-interval">Time Interval:</label>
+        <select id="time-interval">
+            <option value="15" selected>15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+        </select>
+        
+        <label for="grouping">Group By:</label>
+        <select id="grouping">
+            <option value="auto" selected>Auto</option>
+            <option value="hourly">Hourly</option>
+            <option value="daily">Daily</option>
+        </select>
+        
+        <div class="checkbox-group">
+            <input type="checkbox" id="show-peaks" />
+            <label for="show-peaks">Show Monthly Peaks Only</label>
+        </div>
+        
+        <div class="checkbox-group">
+            <input type="checkbox" id="all-funcs" />
+            <label for="all-funcs">All MQ Functions (sum work_total)</label>
+        </div>
+        
+        <div class="btn-group">
+            <button id="generate-graph">Generate Graph</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab-buttons">
+            <button id="tab-graph" class="active">Graph</button>
+        </div>
+        <div id="tab-graph-content" class="tab-content active">
+            <div id="chart-container" style="position: relative; height: 700px; width: 100%; margin: 20px 0; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); padding: 20px;">
+                <canvas id="chart"></canvas>
+            </div>
+            <div id="test-results" style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+                <h4>Console Output:</h4>
+                <div id="console-output" style="font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load chart.js -->
+    <script src="js/chart.js"></script>
+
+    <script>
+        // Simple test without complex dependencies
+        class SimpleMultiSystemTest {
+            constructor() {
+                this.chartManager = new ChartManager();
+                this.consoleOutput = document.getElementById('console-output');
+                this.init();
+            }
+
+            init() {
+                // Set default end date to today
+                const today = new Date();
+                document.getElementById('end-date').value = today.toISOString().split('T')[0];
+                
+                this.setupEventListeners();
+                this.log('✅ Simple Multi-System Test initialized');
+            }
+
+            log(message) {
+                const div = document.createElement('div');
+                div.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+                this.consoleOutput.appendChild(div);
+                this.consoleOutput.scrollTop = this.consoleOutput.scrollHeight;
+                console.log(message);
+            }
+
+            setupEventListeners() {
+                document.getElementById('generate-graph').addEventListener('click', () => {
+                    this.generateGraph();
+                });
+            }
+
+            destroyExistingChart() {
+                // Destroy any existing chart on the canvas
+                const existingChart = Chart.getChart('chart');
+                if (existingChart) {
+                    existingChart.destroy();
+                    this.log('🗑️ Destroyed existing chart');
+                }
+                
+                // Also destroy chartManager instance
+                if (this.chartManager && this.chartManager.chartInstance) {
+                    this.chartManager.chartInstance.destroy();
+                    this.chartManager.chartInstance = null;
+                    this.log('🗑️ Destroyed chartManager instance');
+                }
+            }
+
+            getSearchParams() {
+                const aggregateSystems = document.getElementById('aggregate-systems').checked;
+                
+                // Get all checked system names
+                const systemNames = Array.from(
+                    document.querySelectorAll('#system-names-checkboxes input[type="checkbox"]:checked')
+                ).map(checkbox => checkbox.value);
+                
+                const startDate = document.getElementById('start-date').value;
+                const endDate = document.getElementById('end-date').value;
+                const mqFunction = document.getElementById('mq-function').value;
+                const timeInterval = document.getElementById('time-interval').value;
+                const grouping = document.getElementById('grouping').value;
+                
+                const params = {
+                    startDate,
+                    endDate,
+                    mqFunction,
+                    systemNames: systemNames.length > 0 ? systemNames : null,
+                    timeInterval,
+                    grouping,
+                    aggregateSystems,
+                    showPeaks: document.getElementById('show-peaks').checked,
+                    allFuncs: document.getElementById('all-funcs').checked
+                };
+                
+                this.log('Search params: ' + JSON.stringify(params, null, 2));
+                return params;
+            }
+
+            generateMockDataForSystem(systemName, startDate, endDate, showPeaksOnly = false) {
+                const data = [];
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                
+                // Generate different TPS ranges for different systems
+                const systemRanges = {
+                    'API': { min: 80, max: 200, color: '#3498db' },
+                    'IS FENETM': { min: 50, max: 150, color: '#e74c3c' },
+                    'PMH': { min: 30, max: 120, color: '#2ecc71' }
+                };
+                
+                const range = systemRanges[systemName] || { min: 30, max: 100 };
+                
+                if (showPeaksOnly) {
+                    // Generate monthly peaks only (much cleaner)
+                    const diffMonths = Math.ceil((end - start) / (1000 * 60 * 60 * 24 * 30));
+                    for (let i = 0; i <= Math.max(diffMonths, 12); i++) {
+                        const date = new Date(start.getTime() + i * 30 * 24 * 60 * 60 * 1000);
+                        const peakTps = range.max * (0.8 + Math.random() * 0.2); // 80-100% of max
+                        
+                        data.push({
+                            date_time: date.toISOString(),
+                            trans_per_sec: Math.round(peakTps * 100) / 100,
+                            system_name: systemName
+                        });
+                    }
+                } else {
+                    // Generate daily peak data (simulate finding daily max from 15-minute intervals)
+                    const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+                    for (let i = 0; i <= Math.min(diffDays, 30); i++) { // Limit to 30 days
+                        const date = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+                        
+                        // Simulate daily peak by generating multiple 15-min intervals and taking the max
+                        let dailyPeakTps = 0;
+                        for (let interval = 0; interval < 96; interval++) { // 96 intervals of 15 minutes in a day
+                            const baseTps = range.min + Math.random() * (range.max - range.min);
+                            const timeFactor = Math.sin((interval / 96) * Math.PI * 4) * 0.3; // Multiple peaks per day
+                            const intervalTps = Math.max(0, baseTps + (baseTps * timeFactor));
+                            dailyPeakTps = Math.max(dailyPeakTps, intervalTps);
+                        }
+                        
+                        data.push({
+                            date_time: date.toISOString(),
+                            trans_per_sec: Math.round(dailyPeakTps * 100) / 100,
+                            system_name: systemName
+                        });
+                    }
+                }
+                
+                return data;
+            }
+
+            async generateGraph() {
+                try {
+                    // First, destroy any existing chart
+                    this.destroyExistingChart();
+                    
+                    const params = this.getSearchParams();
+                    
+                    // Validate input
+                    if (!params.mqFunction && !params.allFuncs) {
+                        alert('Please select an MQ Function or enable "All MQ Functions"');
+                        return;
+                    }
+                    
+                    if (!params.allFuncs && (!params.systemNames || params.systemNames.length === 0)) {
+                        alert('Please select at least one system to display');
+                        return;
+                    }
+                    
+                    this.log('🚀 Starting graph generation...');
+                    
+                    if (params.allFuncs) {
+                        this.log('📊 All MQ Functions mode - would call aggregate chart');
+                        alert('All MQ Functions mode not implemented in this test');
+                        return;
+                    }
+                    
+                    // Generate mock data for selected systems
+                    const allData = [];
+                    
+                    for (const systemName of params.systemNames) {
+                        this.log(`📈 Generating mock data for system: ${systemName}`);
+                        const mockData = this.generateMockDataForSystem(
+                            systemName, 
+                            params.startDate, 
+                            params.endDate, 
+                            params.showPeaks
+                        );
+                        allData.push(...mockData);
+                        this.log(`✅ Generated ${mockData.length} records for ${systemName} ${params.showPeaks ? '(peaks only)' : '(daily data)'}`);
+                    }
+                    
+                    this.log(`📊 Total data points: ${allData.length}`);
+                    
+                    if (params.aggregateSystems) {
+                        // Aggregate mode: sum all systems into one line
+                        this.log('🔄 Aggregating data from all systems...');
+                        const aggregatedData = this.aggregateSystemsData(allData, params.systemNames);
+                        
+                        const result = await this.chartManager.displayTpsChart(
+                            'chart',
+                            aggregatedData,
+                            {
+                                title: `Aggregated Systems TPS - ${params.systemNames.join(', ')}`,
+                                grouping: params.grouping
+                            }
+                        );
+                        
+                        if (result) {
+                            this.log('✅ Aggregate chart generated successfully!');
+                        }
+                    } else {
+                        // Separate mode: show each system as separate line (DEFAULT)
+                        this.log('🎯 Creating multi-system chart with separate lines...');
+                        
+                        const processedData = this.chartManager._processMultiSystemData(allData, params.systemNames);
+                        this.log('📋 Processed data: ' + JSON.stringify(Object.keys(processedData)));
+                        
+                        const title = `${params.mqFunction} - Systems Comparison`;
+                        
+                        const result = await this.chartManager.generateMultiSystemChart(
+                            'chart',
+                            processedData,
+                            params.systemNames,
+                            {
+                                title: title,
+                                xLabel: 'Date/Time',
+                                yLabel: 'Transactions Per Second (TPS)'
+                            }
+                        );
+                        
+                        if (result) {
+                            this.log('✅ Multi-system chart generated successfully!');
+                            this.log(`🎨 Chart shows ${params.systemNames.length} systems with different colors`);
+                        }
+                    }
+                    
+                } catch (error) {
+                    this.log('❌ Error generating graph: ' + error.message);
+                    console.error('Error generating graph:', error);
+                }
+            }
+
+            aggregateSystemsData(allData, systemNames) {
+                const timeGroups = new Map();
+                
+                allData.forEach(item => {
+                    const timeKey = item.date_time;
+                    if (!timeGroups.has(timeKey)) {
+                        timeGroups.set(timeKey, {
+                            date_time: timeKey,
+                            trans_per_sec: 0
+                        });
+                    }
+                    
+                    const group = timeGroups.get(timeKey);
+                    group.trans_per_sec += parseFloat(item.trans_per_sec) || 0;
+                });
+                
+                // Convert to array and sort by time
+                return Array.from(timeGroups.values())
+                    .sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
+            }
+        }
+
+        // Initialize test when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new SimpleMultiSystemTest();
+        });
+    </script>
+</body>
+</html>
