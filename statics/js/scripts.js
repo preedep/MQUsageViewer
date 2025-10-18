@@ -217,214 +217,17 @@ class MQDashboard {
             const params = this.getSearchParams();
             console.log('Generate Graph - Params:', params);
             
-            // Validate input
-            if (!params.mqFunction && !params.allFuncs) {
-                alert('Please select an MQ Function or enable "All MQ Functions"');
+            if (!this.validateGraphParams(params)) {
                 return;
             }
             
-            // Skip system validation if using All MQ Functions mode
-            if (!params.allFuncs && (!params.systemNames || params.systemNames.length === 0)) {
-                alert('Please select at least one system to display');
-                return;
-            }
+            this.prepareGraphGeneration();
+            this.logBackendConnection(params);
             
-            this.setActiveTab('graph');
-            window.Utils?.showLoading?.('Generating graph...');
-            
-            // Check backend connection first
-            console.log('🔍 Checking backend connection...');
-            console.log(`API Base URL: ${this.apiService?.baseUrl || 'Not configured'}`);
-            console.log(`Request params:`, {
-                from_datetime: params.startDate,
-                to_datetime: params.endDate,
-                mq_function_name: params.mqFunction,
-                time_interval_minutes: params.timeInterval
-            });
-            
-            // Handle system data based on aggregate mode
             if (params.allFuncs) {
-                // All MQ Functions mode
-                await this.chartManager.generateAggregateChart(
-                    params.startDate,
-                    params.endDate,
-                    params.grouping,
-                    params.timeInterval
-                );
+                await this.generateAllFunctionsChart(params);
             } else if (params.mqFunction) {
-                // Single MQ Function mode - check if we have systems selected
-                if (!params.systemNames || params.systemNames.length === 0) {
-                    // If no systems selected, try to get all systems for this function
-                    try {
-                        const allSystems = await this.apiService.fetchSystemNames(params.mqFunction);
-                        if (allSystems && allSystems.length > 0) {
-                            params.systemNames = allSystems;
-                            console.log('Auto-selected all systems:', allSystems);
-                        } else {
-                            console.warn('No systems found from API, using default systems');
-                            // Use default systems for testing
-                            params.systemNames = ['API', 'FENETM', 'PMH'];
-                        }
-                    } catch (error) {
-                        console.error('Error fetching systems:', error);
-                        console.log('Using default systems due to API error');
-                        // Use default systems for testing
-                        params.systemNames = ['API', 'FENETM', 'PMH'];
-                    }
-                }
-                
-                // Now proceed with the systems we have
-                // Fetch data for selected systems
-                const allData = [];
-                
-                for (const systemName of params.systemNames) {
-                    try {
-                        console.log(`🔄 Fetching data for system: ${systemName}`);
-                        console.log(`   📅 Date range: ${params.startDate} to ${params.endDate}`);
-                        console.log(`   🔧 Function: ${params.mqFunction}`);
-                        console.log(`   ⏱️  Interval: ${params.timeInterval} minutes`);
-                        
-                        // Format dates properly for backend (with timezone)
-                        const startDateTime = new Date(params.startDate + 'T00:00:00+07:00').toISOString();
-                        const endDateTime = new Date(params.endDate + 'T23:59:59+07:00').toISOString();
-                        
-                        console.log(`   📅 Formatted dates: ${startDateTime} to ${endDateTime}`);
-                        
-                        const data = await this.apiService.fetchTpsSummary({
-                            from_datetime: startDateTime,
-                            to_datetime: endDateTime,
-                            mq_function_name: params.mqFunction,
-                            system_name: systemName,
-                            time_interval_minutes: parseInt(params.timeInterval)
-                        });
-                        
-                        console.log(`Data received for ${systemName}:`, data);
-                        console.log(`Data type: ${typeof data}, Is Array: ${Array.isArray(data)}, Length: ${data?.length}`);
-                        
-                        if (data && Array.isArray(data) && data.length > 0) {
-                            console.log(`✅ Using REAL DATA for ${systemName} - ${data.length} records`);
-                            console.log(`Sample data:`, data.slice(0, 3));
-                            const rawDataWithSystem = data.map(item => ({...item, system_name: systemName}));
-                            
-                            if (params.showPeaks) {
-                                // Convert to monthly peaks
-                                const monthlyPeaks = this.convertToMonthlyPeaks(rawDataWithSystem);
-                                allData.push(...monthlyPeaks);
-                                console.log(`Added ${monthlyPeaks.length} monthly peak records for ${systemName} (from ${data.length} 15-min intervals)`);
-                            } else {
-                                // Convert to daily peaks
-                                const dailyPeaks = this.convertToDailyPeaks(rawDataWithSystem);
-                                allData.push(...dailyPeaks);
-                                console.log(`Added ${dailyPeaks.length} daily peak records for ${systemName} (from ${data.length} 15-min intervals)`);
-                            }
-                        } else {
-                            console.warn(`❌ No data found for system: ${systemName} - Using MOCK DATA`);
-                            console.warn(`API Response was:`, data);
-                            console.warn(`Possible causes:`);
-                            console.warn(`  1. No data in database for this system/function/date range`);
-                            console.warn(`  2. System name mismatch in database`);
-                            console.warn(`  3. Date range has no data`);
-                            
-                            // Try to get available systems for debugging
-                            try {
-                                const availableSystems = await this.apiService.fetchSystemNames(params.mqFunction);
-                                console.warn(`Available systems for ${params.mqFunction}:`, availableSystems);
-                            } catch (e) {
-                                console.warn(`Could not fetch available systems:`, e);
-                            }
-                            
-                            // Generate mock data for testing if no real data
-                            const mockData = this.generateMockDataForSystem(systemName, params.startDate, params.endDate);
-                            
-                            if (params.showPeaks) {
-                                const monthlyPeaks = this.convertToMonthlyPeaks(mockData);
-                                allData.push(...monthlyPeaks);
-                                console.log(`Added ${monthlyPeaks.length} mock monthly peak records for ${systemName}`);
-                            } else {
-                                const dailyPeaks = this.convertToDailyPeaks(mockData);
-                                allData.push(...dailyPeaks);
-                                console.log(`Added ${dailyPeaks.length} mock daily peak records for ${systemName}`);
-                            }
-                        }
-                    } catch (error) {
-                        console.error(`❌ API ERROR for ${systemName}:`, error);
-                        console.error(`Using MOCK DATA due to API failure`);
-                        // Generate mock data for testing when API fails
-                        const mockData = this.generateMockDataForSystem(systemName, params.startDate, params.endDate);
-                        
-                        if (params.showPeaks) {
-                            const monthlyPeaks = this.convertToMonthlyPeaks(mockData);
-                            allData.push(...monthlyPeaks);
-                            console.log(`Added ${monthlyPeaks.length} mock monthly peak records for ${systemName} (due to API error)`);
-                        } else {
-                            const dailyPeaks = this.convertToDailyPeaks(mockData);
-                            allData.push(...dailyPeaks);
-                            console.log(`Added ${dailyPeaks.length} mock daily peak records for ${systemName} (due to API error)`);
-                        }
-                    }
-                }
-                
-                if (allData.length === 0) {
-                    alert('No data found for the selected systems');
-                    return;
-                }
-                
-                // Check data source and provide clear summary
-                const realDataCount = allData.filter(item => !item.isMockData).length;
-                const mockDataCount = allData.filter(item => item.isMockData).length;
-                
-                console.log('📊 DATA SOURCE SUMMARY:');
-                console.log(`   ✅ Real API Data: ${realDataCount} records`);
-                console.log(`   🎭 Mock Data: ${mockDataCount} records`);
-                console.log(`   📈 Total Data Points: ${allData.length}`);
-                
-                if (mockDataCount > 0) {
-                    console.warn('⚠️  WARNING: Some data is MOCK/SIMULATED');
-                    console.warn('   Check if backend is running and API is accessible');
-                }
-                
-                if (realDataCount > 0) {
-                    console.log('✅ SUCCESS: Using real data from database');
-                    // Show sample of real data values
-                    const realData = allData.filter(item => !item.isMockData);
-                    const maxTps = Math.max(...realData.map(item => parseFloat(item.trans_per_sec) || 0));
-                    const minTps = Math.min(...realData.map(item => parseFloat(item.trans_per_sec) || 0));
-                    console.log(`   📊 TPS Range: ${minTps.toFixed(2)} - ${maxTps.toFixed(2)}`);
-                }
-                
-                if (params.aggregateSystems) {
-                    // Aggregate mode: sum all systems into one line
-                    await this.generateAggregatedSystemChart(allData, params);
-                } else {
-                    // Separate mode: show each system as separate line (DEFAULT)
-                    console.log('Multi-system mode - Systems:', params.systemNames);
-                    console.log('Multi-system mode - Data count:', allData.length);
-                    
-                    const processedData = this.chartManager._processMultiSystemData(allData, params.systemNames);
-                    console.log('Processed data for multi-system chart:', processedData);
-                    
-                    let title;
-                    if (params.showPeaks) {
-                        title = params.mqFunction 
-                            ? `${params.mqFunction} - Monthly Peak Comparison`
-                            : 'All MQ Functions - Monthly Peak Comparison';
-                    } else {
-                        title = params.mqFunction 
-                            ? `${params.mqFunction} - Daily Peak Comparison`
-                            : 'All MQ Functions - Daily Peak Comparison';
-                    }
-                    
-                    await this.chartManager.generateMultiSystemChart(
-                        'chart',
-                        processedData,
-                        params.systemNames,
-                        {
-                            title: title,
-                            xLabel: 'Date/Time',
-                            yLabel: 'Transactions Per Second (TPS)'
-                        }
-                    );
-                }
+                await this.generateSingleFunctionChart(params);
             } else {
                 alert('Please select at least one system');
                 return;
@@ -435,6 +238,311 @@ class MQDashboard {
             alert('Error generating graph: ' + (error.message || 'Unknown error occurred'));
         } finally {
             window.Utils?.hideLoading?.();
+        }
+    }
+
+    validateGraphParams(params) {
+        if (!params.mqFunction && !params.allFuncs) {
+            alert('Please select an MQ Function or enable "All MQ Functions"');
+            return false;
+        }
+        
+        if (!params.allFuncs && (!params.systemNames || params.systemNames.length === 0)) {
+            alert('Please select at least one system to display');
+            return false;
+        }
+        
+        return true;
+    }
+
+    prepareGraphGeneration() {
+        this.setActiveTab('graph');
+        window.Utils?.showLoading?.('Generating graph...');
+    }
+
+    logBackendConnection(params) {
+        console.log('🔍 Checking backend connection...');
+        console.log(`API Base URL: ${this.apiService?.baseUrl || 'Not configured'}`);
+        console.log(`Request params:`, {
+            from_datetime: params.startDate,
+            to_datetime: params.endDate,
+            mq_function_name: params.mqFunction,
+            time_interval_minutes: params.timeInterval
+        });
+    }
+
+    async generateAllFunctionsChart(params) {
+        await this.chartManager.generateAggregateChart(
+            params.startDate,
+            params.endDate,
+            params.grouping,
+            params.timeInterval
+        );
+    }
+
+    async generateSingleFunctionChart(params) {
+        await this.ensureSystemNames(params);
+        const allData = await this.fetchSystemsData(params);
+        
+        if (allData.length === 0) {
+            alert('No data found for the selected systems');
+            return;
+        }
+        
+        this.logDataSourceSummary(allData);
+        await this.renderChart(allData, params);
+    }
+
+    async ensureSystemNames(params) {
+        if (!params.systemNames || params.systemNames.length === 0) {
+            await this.autoSelectSystems(params);
+        } else {
+            await this.validateSelectedSystems(params);
+        }
+    }
+
+    async autoSelectSystems(params) {
+        try {
+            const allSystems = await this.apiService.fetchSystemNames(params.mqFunction);
+            if (allSystems && allSystems.length > 0) {
+                params.systemNames = allSystems;
+                console.log('✅ Auto-selected systems from API:', allSystems);
+            } else {
+                this.useDefaultSystems(params, 'No systems found from API');
+            }
+        } catch (error) {
+            console.error('❌ Error fetching systems:', error);
+            this.useDefaultSystems(params, 'API error');
+        }
+    }
+
+    async validateSelectedSystems(params) {
+        try {
+            const availableSystems = await this.apiService.fetchSystemNames(params.mqFunction);
+            if (availableSystems && availableSystems.length > 0) {
+                const validationResult = this.filterValidSystems(params.systemNames, availableSystems);
+                this.applySystemValidation(params, validationResult, availableSystems);
+            }
+        } catch (error) {
+            console.warn('Could not validate system names:', error);
+        }
+    }
+
+    useDefaultSystems(params, reason) {
+        console.warn(`⚠️  ${reason}, using default systems`);
+        params.systemNames = ['API', 'FENETM', 'PMH'];
+    }
+
+    filterValidSystems(selectedSystems, availableSystems) {
+        const validSystems = selectedSystems.filter(system => 
+            availableSystems.includes(system)
+        );
+        const invalidSystems = selectedSystems.filter(system => 
+            !availableSystems.includes(system)
+        );
+        
+        return { validSystems, invalidSystems };
+    }
+
+    applySystemValidation(params, validationResult, availableSystems) {
+        const { validSystems, invalidSystems } = validationResult;
+        
+        if (validSystems.length > 0) {
+            params.systemNames = validSystems;
+            console.log('✅ Validated systems:', validSystems);
+            
+            if (invalidSystems.length > 0) {
+                console.warn(`⚠️  Removed invalid systems: ${invalidSystems.join(', ')}`);
+            }
+        } else {
+            console.warn('⚠️  None of selected systems are available, using API systems');
+            params.systemNames = availableSystems;
+        }
+    }
+
+    async fetchSystemsData(params) {
+        const allData = [];
+                
+        for (const systemName of params.systemNames) {
+            try {
+                const systemData = await this.fetchSingleSystemData(systemName, params);
+                allData.push(...systemData);
+            } catch (error) {
+                console.error(`❌ API ERROR for ${systemName}:`, error);
+                const mockData = await this.generateFallbackData(systemName, params);
+                allData.push(...mockData);
+            }
+        }
+        
+        return allData;
+    }
+
+    async fetchSingleSystemData(systemName, params) {
+        console.log(`🔄 Fetching data for system: ${systemName}`);
+        console.log(`   📅 Date range: ${params.startDate} to ${params.endDate}`);
+        console.log(`   🔧 Function: ${params.mqFunction}`);
+        console.log(`   ⏱️  Interval: ${params.timeInterval} minutes`);
+        
+        const { startDateTime, endDateTime } = this.formatDatesForAPI(params);
+        console.log(`   📅 Formatted dates: ${startDateTime} to ${endDateTime}`);
+        
+        const data = await this.apiService.fetchTpsSummary({
+            from_datetime: startDateTime,
+            to_datetime: endDateTime,
+            mq_function_name: params.mqFunction,
+            system_name: systemName,
+            time_interval_minutes: parseInt(params.timeInterval)
+        });
+        
+        console.log(`Data received for ${systemName}:`, data);
+        console.log(`Data type: ${typeof data}, Is Array: ${Array.isArray(data)}, Length: ${data?.length}`);
+        
+        if (data && Array.isArray(data) && data.length > 0) {
+            return await this.processRealData(data, systemName, params);
+        } else {
+            return await this.handleNoData(systemName, params);
+        }
+    }
+
+    formatDatesForAPI(params) {
+        const startDateTime = new Date(params.startDate + 'T00:00:00+07:00').toISOString();
+        const endDateTime = new Date(params.endDate + 'T23:59:59+07:00').toISOString();
+        return { startDateTime, endDateTime };
+    }
+
+    async processRealData(data, systemName, params) {
+        console.log(`✅ Using REAL DATA for ${systemName} - ${data.length} records`);
+        console.log(`Sample data:`, data.slice(0, 3));
+        
+        const rawDataWithSystem = data.map(item => ({...item, system_name: systemName}));
+        
+        if (params.showPeaks) {
+            const monthlyPeaks = this.convertToMonthlyPeaks(rawDataWithSystem);
+            console.log(`Added ${monthlyPeaks.length} monthly peak records for ${systemName} (from ${data.length} 15-min intervals)`);
+            return monthlyPeaks;
+        } else {
+            const dailyPeaks = this.convertToDailyPeaks(rawDataWithSystem);
+            console.log(`Added ${dailyPeaks.length} daily peak records for ${systemName} (from ${data.length} 15-min intervals)`);
+            return dailyPeaks;
+        }
+    }
+
+    async handleNoData(systemName, params) {
+        console.warn(`❌ No data found for system: ${systemName} - Using MOCK DATA`);
+        console.warn(`API Response was: []`);
+        console.warn(`Possible causes:`);
+        console.warn(`  1. No data in database for this system/function/date range`);
+        console.warn(`  2. System name mismatch in database`);
+        console.warn(`  3. Date range has no data`);
+        
+        try {
+            const availableSystems = await this.apiService.fetchSystemNames(params.mqFunction);
+            console.warn(`Available systems for ${params.mqFunction}:`, availableSystems);
+            
+            // If this system is not in available systems, suggest alternatives
+            if (availableSystems && availableSystems.length > 0 && !availableSystems.includes(systemName)) {
+                console.warn(`⚠️  System "${systemName}" not found in available systems.`);
+                console.warn(`   Available systems: ${availableSystems.join(', ')}`);
+                console.warn(`   Using mock data for missing system.`);
+            }
+        } catch (e) {
+            console.warn(`Could not fetch available systems:`, e);
+        }
+        
+        return await this.generateFallbackData(systemName, params);
+    }
+
+    async generateFallbackData(systemName, params) {
+        console.error(`Using MOCK DATA due to API failure`);
+        const mockData = this.generateMockDataForSystem(systemName, params.startDate, params.endDate);
+        
+        if (params.showPeaks) {
+            const monthlyPeaks = this.convertToMonthlyPeaks(mockData);
+            console.log(`Added ${monthlyPeaks.length} mock monthly peak records for ${systemName}`);
+            return monthlyPeaks;
+        } else {
+            const dailyPeaks = this.convertToDailyPeaks(mockData);
+            console.log(`Added ${dailyPeaks.length} mock daily peak records for ${systemName}`);
+            return dailyPeaks;
+        }
+    }
+
+    logDataSourceSummary(allData) {
+        const realDataCount = allData.filter(item => !item.isMockData).length;
+        const mockDataCount = allData.filter(item => item.isMockData).length;
+        
+        console.log('📊 DATA SOURCE SUMMARY:');
+        console.log(`   ✅ Real API Data: ${realDataCount} records`);
+        console.log(`   🎭 Mock Data: ${mockDataCount} records`);
+        console.log(`   📈 Total Data Points: ${allData.length}`);
+        
+        if (mockDataCount > 0) {
+            console.warn('⚠️  WARNING: Some data is MOCK/SIMULATED');
+            console.warn('   Possible reasons:');
+            console.warn('   - Backend not running or not accessible');
+            console.warn('   - No data in database for selected systems/date range');
+            console.warn('   - System names not matching database records');
+        }
+        
+        if (realDataCount > 0) {
+            console.log('✅ SUCCESS: Using real data from database');
+            const realData = allData.filter(item => !item.isMockData);
+            const maxTps = Math.max(...realData.map(item => parseFloat(item.trans_per_sec) || 0));
+            const minTps = Math.min(...realData.map(item => parseFloat(item.trans_per_sec) || 0));
+            console.log(`   📊 TPS Range: ${minTps.toFixed(2)} - ${maxTps.toFixed(2)}`);
+            
+            if (maxTps > 1000) {
+                console.log('   🎉 TPS values look realistic (>1000)');
+            }
+        } else {
+            console.warn('⚠️  NO REAL DATA - All data is simulated');
+            console.warn('   Please check:');
+            console.warn('   1. Backend server is running on port 8888');
+            console.warn('   2. Database contains data for selected MQ function');
+            console.warn('   3. Date range contains actual data');
+        }
+    }
+
+    async renderChart(allData, params) {
+        if (params.aggregateSystems) {
+            await this.generateAggregatedSystemChart(allData, params);
+        } else {
+            await this.generateMultiSystemChart(allData, params);
+        }
+    }
+
+    async generateMultiSystemChart(allData, params) {
+        console.log('Multi-system mode - Systems:', params.systemNames);
+        console.log('Multi-system mode - Data count:', allData.length);
+        
+        const processedData = this.chartManager._processMultiSystemData(allData, params.systemNames);
+        console.log('Processed data for multi-system chart:', processedData);
+        
+        const title = this.generateChartTitle(params);
+        
+        await this.chartManager.generateMultiSystemChart(
+            'chart',
+            processedData,
+            params.systemNames,
+            {
+                title: title,
+                xLabel: 'Date/Time',
+                yLabel: 'Transactions Per Second (TPS)'
+            }
+        );
+        
+        console.log('✅ Multi-system chart generated successfully!');
+    }
+
+    generateChartTitle(params) {
+        if (params.showPeaks) {
+            return params.mqFunction 
+                ? `${params.mqFunction} - Monthly Peak Comparison`
+                : 'All MQ Functions - Monthly Peak Comparison';
+        } else {
+            return params.mqFunction 
+                ? `${params.mqFunction} - Daily Peak Comparison`
+                : 'All MQ Functions - Daily Peak Comparison';
         }
     }
 
