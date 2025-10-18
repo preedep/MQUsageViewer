@@ -25,18 +25,22 @@ class ChartManager {
     }
 
     // Process data to get monthly peaks
-    _getMonthlyPeaks(data, dateKey = 'date_time', valueKey = 'trans_per_sec') {
+    _getMonthlyPeaks(data, timeInterval = 15, dateKey = 'date_time', valueKey = 'trans_per_sec') {
+        // First group data by time intervals
+        const intervalData = this._groupByTimeInterval(data, timeInterval, dateKey, valueKey);
+        
+        // Then find monthly peaks from the interval data
         const monthlyPeaks = new Map();
         
-        data.forEach(item => {
-            const monthKey = this._getMonthKey(item[dateKey]);
-            const currentValue = parseFloat(item[valueKey]);
+        intervalData.forEach(item => {
+            const monthKey = this._getMonthKey(item.date);
+            const currentValue = item.value;
             
             if (!monthlyPeaks.has(monthKey) || currentValue > monthlyPeaks.get(monthKey).value) {
                 monthlyPeaks.set(monthKey, {
-                    date: item[dateKey],
+                    date: item.date,
                     value: currentValue,
-                    label: new Date(item[dateKey]).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                    label: new Date(item.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
                 });
             }
         });
@@ -44,6 +48,61 @@ class ChartManager {
         // Convert map to array and sort by date
         return Array.from(monthlyPeaks.values())
             .sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+    
+    // Helper function to group data by time intervals
+    _groupByTimeInterval(data, intervalMinutes, dateKey, valueKey) {
+        if (!data.length) return [];
+        
+        // Convert interval from minutes to milliseconds
+        const intervalMs = intervalMinutes * 60 * 1000;
+        
+        // Sort data by date
+        const sortedData = [...data].sort((a, b) => 
+            new Date(a[dateKey]) - new Date(b[dateKey])
+        );
+        
+        const result = [];
+        let currentInterval = null;
+        let currentMax = -Infinity;
+        let currentMaxDate = null;
+        
+        sortedData.forEach(item => {
+            const date = new Date(item[dateKey]);
+            const timestamp = date.getTime();
+            const intervalStart = Math.floor(timestamp / intervalMs) * intervalMs;
+            
+            if (currentInterval !== intervalStart) {
+                // Save previous interval's max if exists
+                if (currentInterval !== null) {
+                    result.push({
+                        date: currentMaxDate,
+                        value: currentMax
+                    });
+                }
+                // Start new interval
+                currentInterval = intervalStart;
+                currentMax = -Infinity;
+                currentMaxDate = null;
+            }
+            
+            // Update max for current interval
+            const value = parseFloat(item[valueKey]);
+            if (value > currentMax) {
+                currentMax = value;
+                currentMaxDate = item[dateKey];
+            }
+        });
+        
+        // Add the last interval
+        if (currentMax !== -Infinity) {
+            result.push({
+                date: currentMaxDate,
+                value: currentMax
+            });
+        }
+        
+        return result;
     }
 
     async generateAggregateChart(startDate, endDate, grouping, timeInterval) {
