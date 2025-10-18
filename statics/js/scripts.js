@@ -416,6 +416,13 @@ class MQDashboard {
         
         const rawDataWithSystem = data.map(item => ({...item, system_name: systemName}));
         
+        // For aggregate mode, return raw data (will be processed later)
+        if (params.aggregateSystems) {
+            console.log(`Returning raw data for aggregate mode: ${rawDataWithSystem.length} records`);
+            return rawDataWithSystem;
+        }
+        
+        // For non-aggregate mode, convert to peaks per system
         if (params.showPeaks) {
             const monthlyPeaks = this.convertToMonthlyPeaks(rawDataWithSystem);
             console.log(`Added ${monthlyPeaks.length} monthly peak records for ${systemName} (from ${data.length} 15-min intervals)`);
@@ -456,6 +463,13 @@ class MQDashboard {
         console.error(`Using MOCK DATA due to API failure`);
         const mockData = this.generateMockDataForSystem(systemName, params.startDate, params.endDate);
         
+        // For aggregate mode, return raw data
+        if (params.aggregateSystems) {
+            console.log(`Returning mock raw data for aggregate mode: ${mockData.length} records`);
+            return mockData;
+        }
+        
+        // For non-aggregate mode, convert to peaks
         if (params.showPeaks) {
             const monthlyPeaks = this.convertToMonthlyPeaks(mockData);
             console.log(`Added ${monthlyPeaks.length} mock monthly peak records for ${systemName}`);
@@ -468,38 +482,52 @@ class MQDashboard {
     }
 
     logDataSourceSummary(allData) {
-        const realDataCount = allData.filter(item => !item.isMockData).length;
-        const mockDataCount = allData.filter(item => item.isMockData).length;
-        
-        console.log('📊 DATA SOURCE SUMMARY:');
-        console.log(`   ✅ Real API Data: ${realDataCount} records`);
-        console.log(`   🎭 Mock Data: ${mockDataCount} records`);
-        console.log(`   📈 Total Data Points: ${allData.length}`);
-        
-        if (mockDataCount > 0) {
-            console.warn('⚠️  WARNING: Some data is MOCK/SIMULATED');
-            console.warn('   Possible reasons:');
-            console.warn('   - Backend not running or not accessible');
-            console.warn('   - No data in database for selected systems/date range');
-            console.warn('   - System names not matching database records');
-        }
-        
-        if (realDataCount > 0) {
-            console.log('✅ SUCCESS: Using real data from database');
-            const realData = allData.filter(item => !item.isMockData);
-            const maxTps = Math.max(...realData.map(item => parseFloat(item.trans_per_sec) || 0));
-            const minTps = Math.min(...realData.map(item => parseFloat(item.trans_per_sec) || 0));
-            console.log(`   📊 TPS Range: ${minTps.toFixed(2)} - ${maxTps.toFixed(2)}`);
+        try {
+            const realDataCount = allData.filter(item => !item.isMockData).length;
+            const mockDataCount = allData.filter(item => item.isMockData).length;
             
-            if (maxTps > 1000) {
-                console.log('   🎉 TPS values look realistic (>1000)');
+            console.log('📊 DATA SOURCE SUMMARY:');
+            console.log(`   ✅ Real API Data: ${realDataCount} records`);
+            console.log(`   🎭 Mock Data: ${mockDataCount} records`);
+            console.log(`   📈 Total Data Points: ${allData.length}`);
+            
+            if (mockDataCount > 0) {
+                console.warn('⚠️  WARNING: Some data is MOCK/SIMULATED');
+                console.warn('   Possible reasons:');
+                console.warn('   - Backend not running or not accessible');
+                console.warn('   - No data in database for selected systems/date range');
+                console.warn('   - System names not matching database records');
             }
-        } else {
-            console.warn('⚠️  NO REAL DATA - All data is simulated');
-            console.warn('   Please check:');
-            console.warn('   1. Backend server is running on port 8888');
-            console.warn('   2. Database contains data for selected MQ function');
-            console.warn('   3. Date range contains actual data');
+            
+            if (realDataCount > 0) {
+                console.log('✅ SUCCESS: Using real data from database');
+                
+                // Safely extract TPS values without spreading large objects
+                const tpsValues = [];
+                for (const item of allData) {
+                    if (!item.isMockData && item.trans_per_sec != null) {
+                        tpsValues.push(parseFloat(item.trans_per_sec) || 0);
+                    }
+                }
+                
+                if (tpsValues.length > 0) {
+                    const maxTps = Math.max(...tpsValues);
+                    const minTps = Math.min(...tpsValues);
+                    console.log(`   📊 TPS Range: ${minTps.toFixed(2)} - ${maxTps.toFixed(2)}`);
+                    
+                    if (maxTps > 1000) {
+                        console.log('   🎉 TPS values look realistic (>1000)');
+                    }
+                }
+            } else {
+                console.warn('⚠️  NO REAL DATA - All data is simulated');
+                console.warn('   Please check:');
+                console.warn('   1. Backend server is running on port 8888');
+                console.warn('   2. Database contains data for selected MQ function');
+                console.warn('   3. Date range contains actual data');
+            }
+        } catch (error) {
+            console.error('Error in logDataSourceSummary:', error.message);
         }
     }
 
@@ -548,7 +576,7 @@ class MQDashboard {
 
     async generateAggregatedSystemChart(allData, params) {
         try {
-            // Group data by time and sum TPS across all systems
+            // Step 1: Group by exact timestamp and sum TPS across all systems
             const timeGroups = new Map();
             
             allData.forEach(item => {
@@ -557,35 +585,287 @@ class MQDashboard {
                     timeGroups.set(timeKey, {
                         date_time: timeKey,
                         trans_per_sec: 0,
-                        systems: []
+                        systemData: {}
                     });
                 }
                 
                 const group = timeGroups.get(timeKey);
-                group.trans_per_sec += parseFloat(item.trans_per_sec) || 0;
-                group.systems.push(item.system_name);
+                const tps = parseFloat(item.trans_per_sec) || 0;
+                group.trans_per_sec += tps;
+                group.systemData[item.system_name] = tps;
             });
             
-            // Convert to array and sort by time
-            const aggregatedData = Array.from(timeGroups.values())
+            // Step 2: Convert to array with combined TPS
+            const combinedData = Array.from(timeGroups.values())
                 .sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
+            
+            console.log('Combined data points:', combinedData.length);
+            
+            // Step 3: Find peaks based on the combined TPS
+            let aggregatedData;
+            if (params.showPeaks) {
+                // Monthly peaks of COMBINED data
+                aggregatedData = this.findMonthlyPeaksFromCombined(combinedData);
+                console.log('Monthly peaks found:', aggregatedData.length);
+            } else {
+                // Daily peaks of COMBINED data
+                aggregatedData = this.findDailyPeaksFromCombined(combinedData);
+                console.log('Daily peaks found:', aggregatedData.length);
+            }
             
             // Generate chart title
             const title = params.mqFunction 
                 ? `${params.mqFunction} - Aggregated Systems (${params.systemNames.join(', ')})`
                 : `All MQ Functions - Aggregated Systems (${params.systemNames.join(', ')})`;
             
-            // Display aggregated chart
-            await this.chartManager.displayTpsChart(
-                'chart',
-                aggregatedData,
-                {
-                    title: title,
-                    grouping: params.grouping,
-                    startDate: params.startDate,
-                    endDate: params.endDate
+            // Create custom chart with enhanced tooltip
+            const chartElement = document.getElementById('chart');
+            if (!chartElement) {
+                console.error('Chart container not found');
+                return;
+            }
+            
+            // Destroy any existing chart
+            const existingChart = Chart.getChart('chart');
+            if (existingChart) {
+                existingChart.destroy();
+            }
+            
+            if (this.chartManager.chartInstance) {
+                this.chartManager.chartInstance.destroy();
+                this.chartManager.chartInstance = null;
+            }
+            
+            const ctx = chartElement.getContext('2d');
+            
+            // Check if this is monthly data
+            const timestamps = aggregatedData.map(d => d.date_time);
+            
+            // Inline isMonthlyData check
+            let isMonthlyData = false;
+            if (timestamps.length >= 2) {
+                // Check if all timestamps are on the 15th of the month
+                const monthlyPattern = timestamps.every(timestamp => {
+                    const date = new Date(timestamp);
+                    return date.getDate() === 15;
+                });
+                
+                // Check if the time intervals are roughly monthly (25-35 days apart)
+                const firstDate = new Date(timestamps[0]);
+                const secondDate = new Date(timestamps[1]);
+                const daysDiff = (secondDate - firstDate) / (1000 * 60 * 60 * 24);
+                
+                isMonthlyData = monthlyPattern || (daysDiff >= 25 && daysDiff <= 35);
+            }
+            
+            const labels = aggregatedData.map(item => {
+                const date = new Date(item.date_time);
+                if (isMonthlyData) {
+                    return date.toLocaleString('en-US', { 
+                        month: 'short', 
+                        year: 'numeric'
+                    });
+                } else {
+                    return date.toLocaleString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
                 }
-            );
+            });
+            
+            const values = aggregatedData.map(item => item.trans_per_sec);
+            const maxValue = Math.max(...values);
+            
+            this.chartManager.chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `Aggregated (${params.systemNames.join(', ')})`,
+                        data: values,
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgb(54, 162, 235)' + '20',
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: 'rgb(54, 162, 235)',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointHoverBackgroundColor: 'rgb(54, 162, 235)',
+                        pointHoverBorderColor: '#ffffff',
+                        pointHoverBorderWidth: 3,
+                        tension: 0.4,
+                        fill: false,
+                        spanGaps: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    aspectRatio: 2.5,
+                    layout: {
+                        padding: {
+                            top: 20,
+                            right: 20,
+                            bottom: 20,
+                            left: 20
+                        }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: title,
+                            font: {
+                                size: 18,
+                                weight: 'bold'
+                            },
+                            color: '#2c3e50',
+                            padding: 20
+                        },
+                        legend: {
+                            position: 'top',
+                            align: 'end',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                padding: 20,
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: '#3498db',
+                            borderWidth: 1,
+                            cornerRadius: 6,
+                            displayColors: true,
+                            callbacks: {
+                                title: function(context) {
+                                    return '📅 ' + (isMonthlyData ? 'Month: ' : 'Date: ') + context[0].label;
+                                },
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y;
+                                    return label + ': ' + new Intl.NumberFormat('en-US', { 
+                                        maximumFractionDigits: 2 
+                                    }).format(value) + ' TPS';
+                                },
+                                afterBody: function(context) {
+                                    const dataIndex = context[0].dataIndex;
+                                    const systemData = aggregatedData[dataIndex].systemData;
+                                    const peakDate = aggregatedData[dataIndex].peak_date;
+                                    
+                                    const breakdown = [''];
+                                    
+                                    // Show actual peak date/time
+                                    if (peakDate) {
+                                        const date = new Date(peakDate);
+                                        const formattedDate = date.toLocaleString('th-TH', {
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        });
+                                        breakdown.push(`🎯 Peak occurred at: ${formattedDate}`);
+                                        breakdown.push('');
+                                    }
+                                    
+                                    breakdown.push('📊 System Breakdown at Peak:');
+                                    
+                                    // Show each system's contribution at this peak time
+                                    let total = 0;
+                                    Object.entries(systemData).forEach(([system, tps]) => {
+                                        total += tps;
+                                        breakdown.push(`  • ${system}: ${new Intl.NumberFormat('en-US', { 
+                                            maximumFractionDigits: 2 
+                                        }).format(tps)} TPS`);
+                                    });
+                                    
+                                    breakdown.push('');
+                                    breakdown.push(`📈 Combined Total: ${new Intl.NumberFormat('en-US', { 
+                                        maximumFractionDigits: 2 
+                                    }).format(total)} TPS`);
+                                    breakdown.push('');
+                                    breakdown.push('💡 All systems combined at same time');
+                                    
+                                    return breakdown;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Date/Time',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#2c3e50'
+                            },
+                            ticks: {
+                                maxTicksLimit: 8,
+                                font: {
+                                    size: 11
+                                },
+                                color: '#7f8c8d'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                lineWidth: 1
+                            }
+                        },
+                        y: {
+                            display: true,
+                            beginAtZero: true,
+                            suggestedMax: maxValue * 1.1,
+                            title: {
+                                display: true,
+                                text: 'Transactions Per Second (TPS)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#2c3e50'
+                            },
+                            ticks: {
+                                font: {
+                                    size: 11
+                                },
+                                color: '#7f8c8d',
+                                callback: function(value) {
+                                    return new Intl.NumberFormat('en-US').format(value) + ' TPS';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                lineWidth: 1
+                            }
+                        }
+                    },
+                    elements: {
+                        line: {
+                            borderJoinStyle: 'round'
+                        },
+                        point: {
+                            hoverRadius: 8
+                        }
+                    }
+                }
+            });
             
         } catch (error) {
             console.error('Error generating aggregated system chart:', error);
@@ -677,6 +957,98 @@ class MQDashboard {
         
         console.log(`Converted ${rawData.length} 15-minute records to ${dailyPeaks.length} daily peaks`);
         return dailyPeaks;
+    }
+
+    // Find daily peaks from combined data (sum first, then find peak)
+    findDailyPeaksFromCombined(combinedData) {
+        console.log('Finding daily peaks from combined data, items:', combinedData.length);
+        
+        if (!combinedData || combinedData.length === 0) {
+            console.warn('No combined data to process');
+            return [];
+        }
+        
+        const dailyGroups = new Map();
+        
+        combinedData.forEach(item => {
+            const date = new Date(item.date_time);
+            const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+            
+            if (!dailyGroups.has(dateKey)) {
+                dailyGroups.set(dateKey, []);
+            }
+            
+            dailyGroups.get(dateKey).push(item);
+        });
+        
+        console.log('Daily groups created:', dailyGroups.size);
+        
+        // Find peak for each day
+        const dailyPeaks = [];
+        dailyGroups.forEach((items, dateKey) => {
+            // Find the item with maximum combined TPS
+            const peakItem = items.reduce((max, item) => 
+                (item.trans_per_sec || 0) > (max.trans_per_sec || 0) ? item : max
+            );
+            
+            dailyPeaks.push({
+                date_time: peakItem.date_time,
+                trans_per_sec: peakItem.trans_per_sec || 0,
+                systemData: peakItem.systemData || {},
+                peak_date: dateKey
+            });
+        });
+        
+        console.log('Daily peaks found:', dailyPeaks.length);
+        return dailyPeaks.sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
+    }
+    
+    // Find monthly peaks from combined data (sum first, then find peak)
+    findMonthlyPeaksFromCombined(combinedData) {
+        console.log('Finding monthly peaks from combined data, items:', combinedData.length);
+        
+        if (!combinedData || combinedData.length === 0) {
+            console.warn('No combined data to process');
+            return [];
+        }
+        
+        const monthlyGroups = new Map();
+        
+        combinedData.forEach(item => {
+            const date = new Date(item.date_time);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
+            
+            if (!monthlyGroups.has(monthKey)) {
+                monthlyGroups.set(monthKey, []);
+            }
+            
+            monthlyGroups.get(monthKey).push(item);
+        });
+        
+        console.log('Monthly groups created:', monthlyGroups.size);
+        
+        // Find peak for each month
+        const monthlyPeaks = [];
+        monthlyGroups.forEach((items, monthKey) => {
+            // Find the item with maximum combined TPS
+            const peakItem = items.reduce((max, item) => 
+                (item.trans_per_sec || 0) > (max.trans_per_sec || 0) ? item : max
+            );
+            
+            // Use 15th of month for display
+            const monthDate = new Date(monthKey + '-15T12:00:00Z');
+            
+            monthlyPeaks.push({
+                date_time: monthDate.toISOString(),
+                trans_per_sec: peakItem.trans_per_sec || 0,
+                systemData: peakItem.systemData || {},
+                peak_date: peakItem.date_time, // Actual date/time of peak
+                month_year: monthKey
+            });
+        });
+        
+        console.log('Monthly peaks found:', monthlyPeaks.length);
+        return monthlyPeaks.sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
     }
 
     // Convert data to monthly peak data

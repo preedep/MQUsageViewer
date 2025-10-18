@@ -103,6 +103,13 @@ class SearchableSelect {
                 e.preventDefault();
                 this.close();
                 break;
+            case 'Backspace':
+            case 'Delete':
+                // Allow clearing the input
+                if (!this.isOpen) {
+                    this.open();
+                }
+                break;
         }
     }
     
@@ -163,8 +170,12 @@ class SearchableSelect {
         this.arrow.textContent = '▼';
         this.selectedIndex = -1;
         
-        // Restore selected text if no new selection
-        if (this.selectedText && this.input.value !== this.selectedText) {
+        // If input is empty, clear the selection
+        if (this.input.value.trim() === '') {
+            this.selectedValue = '';
+            this.selectedText = '';
+        } else if (this.selectedText && this.input.value !== this.selectedText) {
+            // Restore selected text if no new selection was made
             this.input.value = this.selectedText;
         }
     }

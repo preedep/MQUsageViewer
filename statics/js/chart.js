@@ -200,67 +200,152 @@ class ChartManager {
                     datasets: [{
                         label: 'TPS Summary (All MQ Functions)',
                         data: values,
-                        borderColor: 'rgba(40,167,69,1)',
-                        backgroundColor: 'rgba(40,167,69,0.2)',
-                        borderWidth: 2,
-                        tension: 0.1,
-                        pointRadius: 3
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgb(54, 162, 235)' + '20',
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: 'rgb(54, 162, 235)',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointHoverBackgroundColor: 'rgb(54, 162, 235)',
+                        pointHoverBorderColor: '#ffffff',
+                        pointHoverBorderWidth: 3,
+                        tension: 0.4,
+                        fill: false,
+                        spanGaps: true
                     }]
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
+                    aspectRatio: 2.5,
+                    layout: {
+                        padding: {
+                            top: 20,
+                            right: 20,
+                            bottom: 20,
+                            left: 20
+                        }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
                     plugins: {
-                        legend: { display: true },
+                        legend: { 
+                            position: 'top',
+                            align: 'end',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                padding: 20,
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
                         title: { 
                             display: true, 
                             text: 'TPS Summary (All MQ Functions)', 
-                            font: { size: 20 } 
+                            font: { 
+                                size: 18,
+                                weight: 'bold'
+                            },
+                            color: '#2c3e50',
+                            padding: 20
                         },
                         tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: '#3498db',
+                            borderWidth: 1,
+                            cornerRadius: 6,
+                            displayColors: true,
                             callbacks: {
+                                title: function(context) {
+                                    return '📅 ' + (showPeaks ? 'Month: ' : 'Date: ') + context[0].label;
+                                },
                                 label: function(context) {
                                     const label = context.dataset.label || '';
                                     const value = context.parsed.y;
-                                    const date = showPeaks 
-                                        ? new Date(summaryData.find(d => d.trans_per_sec === value)?.date_time)
-                                        : new Date(summaryData[context.dataIndex]?.date_time);
-                                    const formattedDate = date ? date.toLocaleString('th-TH', {
-                                        year: 'numeric',
-                                        month: 'short',
-                                        day: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    }) : '';
-                                    return `${label}: ${value} TPS\n${formattedDate}`;
+                                    return label + ': ' + new Intl.NumberFormat('en-US', { 
+                                        maximumFractionDigits: 2 
+                                    }).format(value) + ' TPS';
+                                },
+                                afterBody: function(context) {
+                                    const value = context[0].parsed.y;
+                                    return [
+                                        '',
+                                        '📊 Combined Peak: ' + new Intl.NumberFormat('en-US', { 
+                                            maximumFractionDigits: 2 
+                                        }).format(value) + ' TPS',
+                                        '💡 Note: Aggregated across all MQ functions'
+                                    ];
                                 }
                             }
                         }
                     },
                     scales: {
                         x: { 
+                            display: true,
                             title: { 
                                 display: true, 
                                 text: xAxisLabel, 
-                                font: { size: 16 } 
+                                font: { 
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#2c3e50'
                             }, 
                             ticks: { 
-                                autoSkip: true, 
-                                maxTicksLimit: 20 
-                            } 
+                                maxTicksLimit: 8,
+                                font: {
+                                    size: 11
+                                },
+                                color: '#7f8c8d'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                lineWidth: 1
+                            }
                         },
                         y: { 
+                            display: true,
                             beginAtZero: true, 
                             suggestedMax: maxValue * 1.1, 
                             title: { 
                                 display: true, 
-                                text: 'Transactions per Second (TPS)', 
-                                font: { size: 16 } 
+                                text: 'Transactions Per Second (TPS)', 
+                                font: { 
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#2c3e50'
                             },
                             ticks: {
+                                font: {
+                                    size: 11
+                                },
+                                color: '#7f8c8d',
                                 callback: function(value) {
-                                    return value.toLocaleString('en-US');
+                                    return new Intl.NumberFormat('en-US').format(value) + ' TPS';
                                 }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                lineWidth: 1
                             }
+                        }
+                    },
+                    elements: {
+                        line: {
+                            borderJoinStyle: 'round'
+                        },
+                        point: {
+                            hoverRadius: 8
                         }
                     }
                 }
@@ -760,47 +845,132 @@ class ChartManager {
                     datasets: [{
                         label: options.title || 'TPS Data',
                         data: values,
-                        borderColor: 'rgb(75, 192, 192)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                        borderWidth: 2,
-                        pointRadius: 3,
-                        tension: 0.1,
-                        fill: true
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgb(54, 162, 235)' + '20',
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: 'rgb(54, 162, 235)',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointHoverBackgroundColor: 'rgb(54, 162, 235)',
+                        pointHoverBorderColor: '#ffffff',
+                        pointHoverBorderWidth: 3,
+                        tension: 0.4,
+                        fill: false,
+                        spanGaps: true
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true,
+                    maintainAspectRatio: false,
+                    aspectRatio: 2.5,
+                    layout: {
+                        padding: {
+                            top: 20,
+                            right: 20,
+                            bottom: 20,
+                            left: 20
+                        }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
                     plugins: {
                         title: {
                             display: true,
                             text: options.title || 'TPS Data',
-                            font: { size: 16 }
+                            font: { 
+                                size: 18,
+                                weight: 'bold'
+                            },
+                            color: '#2c3e50',
+                            padding: 20
                         },
                         legend: {
-                            position: 'top'
+                            position: 'top',
+                            align: 'end',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                padding: 20,
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                }
+                            }
                         },
                         tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: '#3498db',
+                            borderWidth: 1,
+                            cornerRadius: 6,
+                            displayColors: true,
                             mode: 'index',
                             intersect: false
                         }
                     },
                     scales: {
                         x: {
+                            display: true,
                             title: {
                                 display: true,
                                 text: 'Date/Time',
-                                font: { size: 14 }
+                                font: { 
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#2c3e50'
+                            },
+                            ticks: {
+                                maxTicksLimit: 8,
+                                font: {
+                                    size: 11
+                                },
+                                color: '#7f8c8d'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                lineWidth: 1
                             }
                         },
                         y: {
+                            display: true,
                             beginAtZero: true,
                             suggestedMax: maxValue * 1.1,
                             title: {
                                 display: true,
                                 text: 'Transactions Per Second (TPS)',
-                                font: { size: 14 }
+                                font: { 
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#2c3e50'
+                            },
+                            ticks: {
+                                font: {
+                                    size: 11
+                                },
+                                color: '#7f8c8d',
+                                callback: function(value) {
+                                    return new Intl.NumberFormat('en-US').format(value) + ' TPS';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                lineWidth: 1
                             }
+                        }
+                    },
+                    elements: {
+                        line: {
+                            borderJoinStyle: 'round'
+                        },
+                        point: {
+                            hoverRadius: 8
                         }
                     }
                 }
