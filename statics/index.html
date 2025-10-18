@@ -39,6 +39,14 @@
     <div id="mq-function-container"></div>
     <label for="system-name">System Name:</label>
     <div id="system-name-container"></div>
+    <div class="checkbox-group">
+        <input type="checkbox" id="aggregate-systems" />
+        <label for="aggregate-systems">Aggregate All Systems (รวมข้อมูลทุก System)</label>
+    </div>
+    <div id="system-names-container" style="display: block; margin-top: 10px;">
+        <label>Select Systems to Display:</label>
+        <div id="system-names-checkboxes"></div>
+    </div>
     <label for="time-interval">⏱️ Time Interval (ช่วงเวลาเฉลี่ย):</label>
     <select id="time-interval" style="background-color: #e3f2fd; border: 2px solid #2196f3; font-weight: bold;">
         <option value="15" selected>15 นาที (Default)</option>
@@ -75,8 +83,8 @@
         <div class="pagination" id="pagination"></div>
     </div>
     <div id="tab-graph-content" class="tab-content">
-        <div id="chart-container">
-            <canvas id="chart" height="300"></canvas>
+        <div id="chart-container" style="position: relative; height: 700px; width: 100%; margin: 20px 0; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); padding: 20px;">
+            <canvas id="chart"></canvas>
         </div>
     </div>
 </div>
