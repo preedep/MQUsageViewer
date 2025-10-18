@@ -297,3 +297,28 @@ th {
 .searchable-select .dropdown-item.no-results:hover {
     background-color: transparent;
 }
+
+/* Loading Spinner */
+.spinner {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto;
+    border: 6px solid rgba(255, 255, 255, 0.3);
+    border-top: 6px solid #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Loading overlay display */
+#loading-overlay {
+    display: none !important;
+}
+
+#loading-overlay.show {
+    display: flex !important;
+}

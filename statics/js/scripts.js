@@ -10,7 +10,30 @@ class MQDashboard {
         this.mqFunctionSelect = null;
         this.systemNameSelect = null;
         
+        // Loading overlay
+        this.loadingOverlay = null;
+        
         this.init();
+    }
+    
+    showLoading() {
+        if (!this.loadingOverlay) {
+            this.loadingOverlay = document.getElementById('loading-overlay');
+        }
+        if (this.loadingOverlay) {
+            console.log('🔄 Showing loading overlay');
+            this.loadingOverlay.classList.add('show');
+        }
+    }
+    
+    hideLoading() {
+        if (!this.loadingOverlay) {
+            this.loadingOverlay = document.getElementById('loading-overlay');
+        }
+        if (this.loadingOverlay) {
+            console.log('✅ Hiding loading overlay');
+            this.loadingOverlay.classList.remove('show');
+        }
     }
 
     init() {
@@ -214,10 +237,14 @@ class MQDashboard {
 
     async generateGraph() {
         try {
+            // Show loading overlay
+            this.showLoading();
+            
             const params = this.getSearchParams();
             console.log('Generate Graph - Params:', params);
             
             if (!this.validateGraphParams(params)) {
+                this.hideLoading();
                 return;
             }
             
@@ -229,15 +256,14 @@ class MQDashboard {
             } else if (params.mqFunction) {
                 await this.generateSingleFunctionChart(params);
             } else {
-                alert('Please select at least one system');
-                return;
+                alert('Please select an MQ Function or enable "All MQ Functions" mode');
             }
-            
         } catch (error) {
             console.error('Error generating graph:', error);
-            alert('Error generating graph: ' + (error.message || 'Unknown error occurred'));
+            alert('Error generating graph: ' + (error.message || 'Unknown error'));
         } finally {
-            window.Utils?.hideLoading?.();
+            // Hide loading overlay
+            this.hideLoading();
         }
     }
 
