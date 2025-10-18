@@ -19,10 +19,15 @@ class MQDashboard {
     showLoading() {
         if (!this.loadingOverlay) {
             this.loadingOverlay = document.getElementById('loading-overlay');
+            console.log('Loading overlay element:', this.loadingOverlay);
         }
         if (this.loadingOverlay) {
             console.log('🔄 Showing loading overlay');
+            console.log('Current classes:', this.loadingOverlay.className);
             this.loadingOverlay.classList.add('show');
+            console.log('After adding show:', this.loadingOverlay.className);
+        } else {
+            console.error('❌ Loading overlay element not found!');
         }
     }
     
@@ -236,6 +241,7 @@ class MQDashboard {
     }
 
     async generateGraph() {
+        console.log('🎯 generateGraph() called');
         try {
             // Show loading overlay
             this.showLoading();
