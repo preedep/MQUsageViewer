@@ -37,3 +37,4 @@ target/
 /.idea/copilot.data.migration.ask2agent.xml
 /.idea/copilot.data.migration.edit.xml
 /datasets/mqdata_v2.db
+/datasets/mqdata_v4.db

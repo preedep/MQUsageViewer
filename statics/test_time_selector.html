@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Interval Selector Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-panel { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            border: 2px solid #007bff; 
+            border-radius: 8px; 
+            margin: 20px 0;
+        }
+        label { 
+            display: block; 
+            margin: 10px 0 5px 0; 
+            font-weight: bold; 
+            color: #333;
+        }
+        select { 
+            width: 100%; 
+            padding: 10px; 
+            font-size: 16px; 
+            border: 2px solid #007bff; 
+            border-radius: 4px;
+            background: white;
+        }
+        .result { 
+            margin: 15px 0; 
+            padding: 15px; 
+            background: #e9ecef; 
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🕐 Time Interval Selector Test</h1>
+    
+    <div class="test-panel">
+        <h2>Time Interval Selection</h2>
+        <label for="time-interval">เลือกช่วงเวลาเฉลี่ย (Time Interval):</label>
+        <select id="time-interval">
+            <option value="15" selected>15 นาที (Default)</option>
+            <option value="30">30 นาที</option>
+            <option value="60">1 ชั่วโมง</option>
+            <option value="120">2 ชั่วโมง</option>
+            <option value="240">4 ชั่วโมง</option>
+        </select>
+        
+        <div id="result" class="result">
+            เลือกช่วงเวลาเพื่อดูผลลัพธ์
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('time-interval').addEventListener('change', function(e) {
+            const value = e.target.value;
+            const text = e.target.options[e.target.selectedIndex].text;
+            
+            document.getElementById('result').innerHTML = `
+                <strong>ค่าที่เลือก:</strong> ${value} นาที<br>
+                <strong>ข้อความ:</strong> ${text}<br>
+                <strong>สถานะ:</strong> ${value === '15' ? 'ใช้ข้อมูลจากฐานข้อมูลโดยตรง' : 'จะทำการเฉลี่ยข้อมูล'}
+            `;
+        });
+        
+        // Trigger initial display
+        document.getElementById('time-interval').dispatchEvent(new Event('change'));
+    </script>
+</body>
+</html>

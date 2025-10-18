@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let secret_value = std::env::var("SECRET_VALUE").expect("SECRET_VALUE must be set");
     let salt_key = std::env::var("SALT_KEY").expect("SALT_KEY must be set");
 
-    let connection = rusqlite::Connection::open("datasets/mqdata_v2.db").expect("Failed to open database");
+    let connection = rusqlite::Connection::open("datasets/mqdata_v4.db").expect("Failed to open database");
 
     let redis_client = match std::env::var("REDIS_URL") {
         Ok(redis_url) => match RedisClient::open(redis_url) {
