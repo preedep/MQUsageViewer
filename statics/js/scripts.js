@@ -47,9 +47,8 @@ class MQDashboard {
     }
 
     init() {
-        // Set default end date to today
-        const today = new Date();
-        document.getElementById('end-date').value = today.toISOString().split('T')[0];
+        // Set default datetime values
+        this.initializeDateTimeInputs();
         
         // Initialize components
         this.authManager.checkTokenAndRedirect();
@@ -61,6 +60,40 @@ class MQDashboard {
         
         // Make table manager globally accessible for onclick handlers
         window.tableManager = this.tableManager;
+    }
+
+    initializeDateTimeInputs() {
+        // Start: 01/01/2023 00:00
+        const defaultStart = new Date(2023, 0, 1, 0, 0);
+        
+        // End: Today 23:59
+        const now = new Date();
+        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59);
+        
+        // Format: YYYY-MM-DDTHH:mm
+        const formatDateTime = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        };
+        
+        const startInput = document.getElementById('start-datetime');
+        const endInput = document.getElementById('end-datetime');
+        
+        if (startInput) {
+            startInput.value = formatDateTime(defaultStart);
+        }
+        if (endInput) {
+            endInput.value = formatDateTime(endOfToday);
+        }
+        
+        console.log('📅 DateTime inputs initialized:', {
+            start: startInput?.value,
+            end: endInput?.value
+        });
     }
 
     setupTimeIntervalDebug() {
@@ -188,8 +221,13 @@ class MQDashboard {
             document.querySelectorAll('#system-names-checkboxes input[type="checkbox"]:checked')
         ).map(checkbox => checkbox.value);
         
-        const startDate = document.getElementById('start-date').value;
-        const endDate = document.getElementById('end-date').value;
+        // Get datetime values (format: YYYY-MM-DDTHH:mm)
+        const startDateTime = document.getElementById('start-datetime')?.value;
+        const endDateTime = document.getElementById('end-datetime')?.value;
+        
+        // Extract date only for backward compatibility
+        const startDate = startDateTime ? startDateTime.split('T')[0] : null;
+        const endDate = endDateTime ? endDateTime.split('T')[0] : null;
         
         // Get MQ Function value - try SearchableSelect first, then fallback to direct element
         let mqFunction = null;
@@ -209,6 +247,8 @@ class MQDashboard {
         const params = {
             startDate,
             endDate,
+            startDateTime,  // Full datetime with time
+            endDateTime,    // Full datetime with time
             mqFunction,
             systemNames: systemNames.length > 0 ? systemNames : null,
             timeInterval,
@@ -479,8 +519,27 @@ class MQDashboard {
     }
 
     formatDatesForAPI(params) {
-        const startDateTime = new Date(params.startDate + 'T00:00:00+07:00').toISOString();
-        const endDateTime = new Date(params.endDate + 'T23:59:59+07:00').toISOString();
+        // If we have full datetime, use it; otherwise fallback to date only
+        let startDateTime, endDateTime;
+        
+        if (params.startDateTime && params.endDateTime) {
+            // Use datetime-local values (format: YYYY-MM-DDTHH:mm)
+            startDateTime = new Date(params.startDateTime + ':00+07:00').toISOString();
+            endDateTime = new Date(params.endDateTime + ':59+07:00').toISOString();
+            console.log('📅 Using datetime inputs:', {
+                input: { start: params.startDateTime, end: params.endDateTime },
+                iso: { start: startDateTime, end: endDateTime }
+            });
+        } else {
+            // Fallback to date only (backward compatibility)
+            startDateTime = new Date(params.startDate + 'T00:00:00+07:00').toISOString();
+            endDateTime = new Date(params.endDate + 'T23:59:59+07:00').toISOString();
+            console.log('📅 Using date inputs (fallback):', {
+                input: { start: params.startDate, end: params.endDate },
+                iso: { start: startDateTime, end: endDateTime }
+            });
+        }
+        
         return { startDateTime, endDateTime };
     }
 

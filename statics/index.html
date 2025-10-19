@@ -9,7 +9,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <!-- CSS and JS with cache busting -->
-    <link rel="stylesheet" href="css/styles.css?v=1.5&t=20241018" />
+    <link rel="stylesheet" href="css/styles.css?v=1.6&t=20241019" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Load modules in dependency order -->
     <script src="js/utils.js?v=1.3&t=20241018"></script>
@@ -26,10 +26,10 @@
 </div>
 
 <div class="search-panel">
-    <label for="start-date">Start Date:</label>
-    <input type="date" id="start-date" value="2024-01-01" />
-    <label for="end-date">End Date:</label>
-    <input type="date" id="end-date" />
+    <label for="start-datetime">🗓️ Start Date & Time:</label>
+    <input type="datetime-local" id="start-datetime" class="datetime-input" />
+    <label for="end-datetime">🗓️ End Date & Time:</label>
+    <input type="datetime-local" id="end-datetime" class="datetime-input" />
     <!-- Aggregate Mode Toggle -->
     <div class="checkbox-group">
         <input type="checkbox" id="all-funcs" />
@@ -89,7 +89,7 @@
     </div>
 </div>
 
-<script src="js/scripts.js?v=2.5&t=20241019"></script>
+<script src="js/scripts.js?v=2.7&t=20241019"></script>
 
 <!-- Loading Overlay -->
 <div id="loading-overlay" style="

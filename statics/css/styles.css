@@ -322,3 +322,41 @@ th {
 #loading-overlay.show {
     display: flex !important;
 }
+
+/* DateTime Input Styling */
+.datetime-input {
+    padding: 10px 12px;
+    border: 2px solid #4CAF50;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f9f9f9;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    min-width: 220px;
+}
+
+.datetime-input:hover {
+    border-color: #45a049;
+    background-color: #ffffff;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+}
+
+.datetime-input:focus {
+    outline: none;
+    border-color: #2196F3;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+/* Calendar icon styling */
+.datetime-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.datetime-input::-webkit-calendar-picker-indicator:hover {
+    background-color: rgba(76, 175, 80, 0.1);
+}
