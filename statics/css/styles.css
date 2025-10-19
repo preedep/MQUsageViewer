@@ -619,6 +619,157 @@ th {
     transform: translateY(0);
 }
 
+/* Enhanced Search Panel Styles */
+.quick-presets {
+    margin-bottom: 15px;
+}
+
+.preset-label {
+    display: block;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.preset-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.preset-btn {
+    padding: 8px 16px;
+    border: 2px solid #e0e6ed;
+    background: #ffffff;
+    color: #64748b;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 50px;
+}
+
+.preset-btn:hover {
+    border-color: #3498db;
+    color: #3498db;
+    background: #f8fafc;
+}
+
+.preset-btn.active {
+    background: #3498db;
+    border-color: #3498db;
+    color: white;
+    box-shadow: 0 2px 4px rgba(52, 152, 219, 0.2);
+}
+
+.custom-range {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e0e6ed;
+}
+
+.number-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e0e6ed;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+
+.number-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.number-input::placeholder {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.input-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: #64748b;
+    font-style: italic;
+}
+
+.date-range-info {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, #e3f2fd 0%, #f1f8e9 100%);
+    border: 1px solid #90caf9;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.info-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.info-icon {
+    font-size: 1rem;
+}
+
+.info-text {
+    font-size: 0.85rem;
+    color: #1565c0;
+    font-weight: 500;
+}
+
+/* Enhanced section styling */
+.criteria-section {
+    background: #ffffff;
+    border: 1px solid #e0e6ed;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.section-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e6ed;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.section-icon {
+    font-size: 1.2rem;
+}
+
+.section-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    flex: 1;
+}
+
+.section-badge {
+    background: #3498db;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.section-content {
+    padding: 16px;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .input-row {
@@ -631,5 +782,18 @@ th {
     
     .peak-mode-options {
         grid-template-columns: 1fr;
+    }
+    
+    .preset-buttons {
+        justify-content: center;
+    }
+    
+    .preset-btn {
+        flex: 1;
+        min-width: 60px;
+    }
+    
+    .input-group {
+        margin-bottom: 15px;
     }
 }

@@ -57,18 +57,18 @@ class MQDashboard {
         this.setupAggregateToggle();
         this.setupEventListeners();
         this.setupTimeIntervalDebug();
+        this.setupTimePresets();
         
         // Make table manager globally accessible for onclick handlers
         window.tableManager = this.tableManager;
     }
 
     initializeDateTimeInputs() {
-        // Start: 01/01/2023 00:00
+        // Start: 01/01/2023 00:00 (Database data start)
         const defaultStart = new Date(2023, 0, 1, 0, 0);
         
-        // End: Today 23:59
-        const now = new Date();
-        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59);
+        // End: Current time (allow analysis up to now)
+        const defaultEnd = new Date();
         
         // Format: YYYY-MM-DDTHH:mm
         const formatDateTime = (date) => {
@@ -87,12 +87,14 @@ class MQDashboard {
             startInput.value = formatDateTime(defaultStart);
         }
         if (endInput) {
-            endInput.value = formatDateTime(endOfToday);
+            endInput.value = formatDateTime(defaultEnd);
         }
         
         console.log('📅 DateTime inputs initialized:', {
             start: startInput?.value,
-            end: endInput?.value
+            end: endInput?.value,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            note: 'Start: Database start (2023-01-01), End: Current time'
         });
     }
 
@@ -241,9 +243,15 @@ class MQDashboard {
         const timeInterval = document.getElementById('time-interval').value;
         const grouping = document.getElementById('grouping').value;
         
-        // Get peak mode selection
-        const peakModeRadio = document.querySelector('input[name="peak-mode"]:checked');
-        const peakMode = peakModeRadio ? peakModeRadio.value : 'all';
+        // Get peak selection from Advanced Filters
+        const peakSelection = document.getElementById('peak-selection')?.value || 'all';
+        
+        // Get TPS threshold values
+        const minTps = parseFloat(document.getElementById('min-tps')?.value) || null;
+        const maxTps = parseFloat(document.getElementById('max-tps')?.value) || null;
+        
+        // Get time aggregation setting
+        const timeAggregation = document.getElementById('time-aggregation')?.value || '15min';
         
         const params = {
             startDate,
@@ -257,7 +265,10 @@ class MQDashboard {
             aggregateSystems,  // true = รวมข้อมูล, false = แสดงแยก
             showPeaks: document.getElementById('show-peaks')?.checked || false,
             allFuncs: document.getElementById('all-funcs')?.checked || false,
-            peakMode: peakMode  // 'all' or 'specific'
+            peakSelection: peakSelection,  // 'all', 'specific', 'weekdays', 'weekends'
+            minTps: minTps,      // Minimum TPS threshold
+            maxTps: maxTps,      // Maximum TPS threshold
+            timeAggregation: timeAggregation  // Time aggregation method
         };
         
         console.log('getSearchParams result:', params);
@@ -283,6 +294,18 @@ class MQDashboard {
             
             console.log('🔍 Performing search with params:', params);
             
+            // Show advanced filters status
+            if (params.minTps || params.maxTps || (params.timeAggregation && params.timeAggregation !== '15min') || (params.peakSelection && params.peakSelection !== 'all')) {
+                console.log('🔧 Advanced Filters Active:', {
+                    minTps: params.minTps || 'None',
+                    maxTps: params.maxTps || 'None', 
+                    timeAggregation: params.timeAggregation || '15min',
+                    peakSelection: params.peakSelection || 'all'
+                });
+            } else {
+                console.log('🔧 No advanced filters applied');
+            }
+            
             // Format dates for API
             const { startDateTime, endDateTime } = this.formatDatesForAPI(params);
             
@@ -300,13 +323,57 @@ class MQDashboard {
                 
                 if (response.success && response.data && Array.isArray(response.data) && response.data.length > 0) {
                     console.log(`Found ${response.data.length} records for ${systemName}`);
-                    allResults.push(...response.data);
+                    
+                    // Apply advanced filters to search results
+                    let filteredData = response.data.map(item => ({...item, system_name: systemName}));
+                    
+                    // Apply TPS filtering if specified
+                    if (params.minTps || params.maxTps) {
+                        const beforeCount = filteredData.length;
+                        filteredData = this.applyTpsFiltering(filteredData, params.minTps, params.maxTps);
+                        console.log(`🔍 TPS Filter applied to ${systemName}: ${beforeCount} → ${filteredData.length} records`);
+                    }
+                    
+                    // Apply time aggregation if specified
+                    if (params.timeAggregation && params.timeAggregation !== '15min') {
+                        const beforeCount = filteredData.length;
+                        filteredData = this.applyTimeAggregation(filteredData, params.timeAggregation);
+                        console.log(`⏱️ Time Aggregation applied to ${systemName}: ${beforeCount} → ${filteredData.length} records`);
+                    }
+                    
+                    // Apply peak selection if specified
+                    if (params.peakSelection && params.peakSelection !== 'all') {
+                        const beforeCount = filteredData.length;
+                        filteredData = this.applyPeakSelection(filteredData, params.peakSelection);
+                        console.log(`🎯 Peak Selection applied to ${systemName}: ${beforeCount} → ${filteredData.length} records`);
+                    }
+                    
+                    allResults.push(...filteredData);
                 } else {
                     console.log(`No data found for ${systemName}`);
+                    console.log(`API Response:`, response);
+                    console.log(`Search params used:`, {
+                        from_datetime: startDateTime,
+                        to_datetime: endDateTime,
+                        mq_function_name: params.mqFunction,
+                        system_name: systemName
+                    });
                 }
             }
             
             console.log(`Total search results: ${allResults.length}`);
+            
+            // Show filter summary if filters were applied
+            if (params.minTps || params.maxTps || (params.timeAggregation && params.timeAggregation !== '15min')) {
+                console.log('📊 Advanced Filters Summary:', {
+                    originalRecords: 'Check individual system logs above',
+                    finalRecords: allResults.length,
+                    filtersApplied: {
+                        tpsFilter: params.minTps || params.maxTps ? `${params.minTps || 0} - ${params.maxTps || '∞'}` : 'None',
+                        timeAggregation: params.timeAggregation || '15min'
+                    }
+                });
+            }
             
             if (allResults.length > 0) {
                 // Display results in table
@@ -526,16 +593,44 @@ class MQDashboard {
         
         if (params.startDateTime && params.endDateTime) {
             // Use datetime-local values (format: YYYY-MM-DDTHH:mm)
-            startDateTime = new Date(params.startDateTime + ':00+07:00').toISOString();
-            endDateTime = new Date(params.endDateTime + ':59+07:00').toISOString();
+            // Create dates in local timezone, then convert to ISO
+            const startDate = new Date(params.startDateTime + ':00');
+            const endDate = new Date(params.endDateTime + ':59');
+            
+            startDateTime = startDate.toISOString();
+            endDateTime = endDate.toISOString();
+            
+            // Check if dates are outside known data range
+            const dataStartDate = new Date('2023-01-01T00:00:00');
+            const dataEndDate = new Date('2023-12-31T23:59:59');
+            
+            let warnings = [];
+            if (startDate < dataStartDate) {
+                warnings.push(`⚠️ Start date (${startDate.toLocaleDateString()}) is before available data (Jan 1, 2023)`);
+            }
+            if (endDate > new Date() && endDate > dataEndDate) {
+                warnings.push(`ℹ️ End date (${endDate.toLocaleDateString()}) is beyond known data range (Dec 31, 2023) - may return no results`);
+            }
+            
             console.log('📅 Using datetime inputs:', {
                 input: { start: params.startDateTime, end: params.endDateTime },
-                iso: { start: startDateTime, end: endDateTime }
+                local: { start: startDate.toString(), end: endDate.toString() },
+                iso: { start: startDateTime, end: endDateTime },
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                warnings: warnings.length > 0 ? warnings : 'None'
             });
+            
+            // Show warnings to user
+            if (warnings.length > 0) {
+                warnings.forEach(warning => console.warn(warning));
+            }
         } else {
             // Fallback to date only (backward compatibility)
-            startDateTime = new Date(params.startDate + 'T00:00:00+07:00').toISOString();
-            endDateTime = new Date(params.endDate + 'T23:59:59+07:00').toISOString();
+            const startDate = new Date(params.startDate + 'T00:00:00');
+            const endDate = new Date(params.endDate + 'T23:59:59');
+            
+            startDateTime = startDate.toISOString();
+            endDateTime = endDate.toISOString();
             console.log('📅 Using date inputs (fallback):', {
                 input: { start: params.startDate, end: params.endDate },
                 iso: { start: startDateTime, end: endDateTime }
@@ -555,22 +650,37 @@ class MQDashboard {
         const minTps = Math.min(...tpsValues);
         console.log(`📊 ${systemName} TPS range: ${minTps} - ${maxTps}`);
         
-        const rawDataWithSystem = data.map(item => ({...item, system_name: systemName}));
+        let processedData = data.map(item => ({...item, system_name: systemName}));
         
-        // For aggregate mode, return raw data (will be processed later)
+        // Apply TPS filtering if specified
+        if (params.minTps || params.maxTps) {
+            processedData = this.applyTpsFiltering(processedData, params.minTps, params.maxTps);
+        }
+        
+        // Apply time aggregation if specified
+        if (params.timeAggregation && params.timeAggregation !== '15min') {
+            processedData = this.applyTimeAggregation(processedData, params.timeAggregation);
+        }
+        
+        // Apply peak selection if specified
+        if (params.peakSelection && params.peakSelection !== 'all') {
+            processedData = this.applyPeakSelection(processedData, params.peakSelection);
+        }
+        
+        // For aggregate mode, return processed data (will be processed later)
         if (params.aggregateSystems) {
-            console.log(`Returning raw data for aggregate mode: ${rawDataWithSystem.length} records`);
-            return rawDataWithSystem;
+            console.log(`Returning processed data for aggregate mode: ${processedData.length} records`);
+            return processedData;
         }
         
         // For non-aggregate mode, convert to peaks per system
         if (params.showPeaks) {
-            const monthlyPeaks = this.convertToMonthlyPeaks(rawDataWithSystem);
+            const monthlyPeaks = this.convertToMonthlyPeaks(processedData);
             console.log(`Added ${monthlyPeaks.length} monthly peak records for ${systemName} (from ${data.length} 15-min intervals)`);
             console.log(`Monthly peaks sample:`, monthlyPeaks.slice(0, 2));
             return monthlyPeaks;
         } else {
-            const dailyPeaks = this.convertToDailyPeaks(rawDataWithSystem);
+            const dailyPeaks = this.convertToDailyPeaks(processedData);
             console.log(`Added ${dailyPeaks.length} daily peak records for ${systemName} (from ${data.length} 15-min intervals)`);
             console.log(`Daily peaks sample:`, dailyPeaks.slice(0, 2));
             return dailyPeaks;
@@ -821,9 +931,9 @@ class MQDashboard {
                 console.log('Monthly peaks found:', aggregatedData.length);
             } else {
                 // Daily peaks of COMBINED data
-                aggregatedData = this.findDailyPeaksFromCombined(combinedData, params.peakMode);
+                aggregatedData = this.findDailyPeaksFromCombined(combinedData, params.peakSelection);
                 console.log('Daily peaks found:', aggregatedData.length);
-                if (params.peakMode === 'specific') {
+                if (params.peakSelection === 'specific') {
                     console.log('🎯 Filtered to specific days (1st, 16th, last of month)');
                 }
             }
@@ -881,12 +991,26 @@ class MQDashboard {
                         year: 'numeric'
                     });
                 } else {
-                    return date.toLocaleString('en-US', { 
+                    // Use consistent timezone formatting
+                    const label = date.toLocaleString('en-US', { 
                         month: 'short', 
                         day: 'numeric', 
                         hour: '2-digit', 
-                        minute: '2-digit' 
+                        minute: '2-digit',
+                        timeZone: 'Asia/Bangkok'
                     });
+                    
+                    // Debug: Log first few labels to check timezone consistency
+                    if (aggregatedData.indexOf(item) < 3) {
+                        console.log(`📅 Chart label debug:`, {
+                            original: item.date_time,
+                            dateObject: date.toString(),
+                            label: label,
+                            timezone: 'Asia/Bangkok'
+                        });
+                    }
+                    
+                    return label;
                 }
             });
             
@@ -978,20 +1102,30 @@ class MQDashboard {
                                 afterBody: function(context) {
                                     const dataIndex = context[0].dataIndex;
                                     const systemData = aggregatedData[dataIndex].systemData;
-                                    const peakDate = aggregatedData[dataIndex].peak_date;
+                                    const peakDateTime = aggregatedData[dataIndex].date_time;
                                     
                                     const breakdown = [''];
                                     
                                     // Show actual peak date/time
-                                    if (peakDate) {
-                                        const date = new Date(peakDate);
-                                        const formattedDate = date.toLocaleString('th-TH', {
+                                    if (peakDateTime) {
+                                        const date = new Date(peakDateTime);
+                                        const formattedDate = date.toLocaleString('en-US', {
                                             year: 'numeric',
                                             month: 'short',
                                             day: 'numeric',
                                             hour: '2-digit',
-                                            minute: '2-digit'
+                                            minute: '2-digit',
+                                            timeZone: 'Asia/Bangkok'
                                         });
+                                        
+                                        // Debug: Log tooltip date formatting
+                                        console.log(`📅 Tooltip date debug:`, {
+                                            original: peakDateTime,
+                                            dateObject: date.toString(),
+                                            formatted: formattedDate,
+                                            timezone: 'Asia/Bangkok'
+                                        });
+                                        
                                         breakdown.push(`🎯 Peak occurred at: ${formattedDate}`);
                                         breakdown.push('');
                                     }
@@ -1183,9 +1317,9 @@ class MQDashboard {
     }
 
     // Find daily peaks from combined data (sum first, then find peak)
-    findDailyPeaksFromCombined(combinedData, peakMode = 'all') {
+    findDailyPeaksFromCombined(combinedData, peakSelection = 'all') {
         console.log('Finding daily peaks from combined data, items:', combinedData.length);
-        console.log('Peak mode:', peakMode);
+        console.log('Peak selection:', peakSelection);
         
         if (!combinedData || combinedData.length === 0) {
             console.warn('No combined data to process');
@@ -1225,14 +1359,26 @@ class MQDashboard {
         
         console.log('Daily peaks found:', dailyPeaks.length);
         
-        // Filter by peak mode if 'specific'
-        if (peakMode === 'specific') {
-            const filteredPeaks = this.filterSpecificDayPeaks(dailyPeaks);
-            console.log('Filtered to specific days (1st, 16th, last):', filteredPeaks.length);
+        // Apply peak selection filtering using the unified function
+        const sortedPeaks = dailyPeaks.sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
+        
+        if (peakSelection && peakSelection !== 'all') {
+            const filteredPeaks = this.applyPeakSelection(sortedPeaks, peakSelection);
+            console.log(`🎯 Peak selection (${peakSelection}) applied: ${sortedPeaks.length} → ${filteredPeaks.length} peaks`);
+            
+            // Show selected dates for debugging
+            if (filteredPeaks.length > 0) {
+                const selectedDates = filteredPeaks.map(peak => {
+                    const date = new Date(peak.date_time);
+                    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+                });
+                console.log(`📅 Selected dates (${peakSelection}):`, selectedDates);
+            }
+            
             return filteredPeaks;
         }
         
-        return dailyPeaks.sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
+        return sortedPeaks;
     }
     
     filterSpecificDayPeaks(dailyPeaks) {
@@ -1431,6 +1577,248 @@ class MQDashboard {
         document.getElementById('tab-graph').classList.toggle('active', tabName === 'graph');
         document.getElementById('tab-search-content').classList.toggle('active', tabName === 'search');
         document.getElementById('tab-graph-content').classList.toggle('active', tabName === 'graph');
+    }
+
+    setupTimePresets() {
+        const presetButtons = document.querySelectorAll('.preset-btn');
+        const customRange = document.getElementById('custom-range');
+        const startInput = document.getElementById('start-datetime');
+        const endInput = document.getElementById('end-datetime');
+
+        presetButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active class from all buttons
+                presetButtons.forEach(b => b.classList.remove('active'));
+                // Add active class to clicked button
+                btn.classList.add('active');
+
+                const now = new Date();
+                let startDate, endDate;
+
+                if (btn.dataset.custom) {
+                    // Show custom range inputs and hide date info
+                    customRange.style.display = 'block';
+                    
+                    // Set custom range: start = 2023-01-01, end = current time
+                    const customStartDate = new Date(2023, 0, 1, 0, 0); // 2023-01-01 00:00
+                    const customEndDate = new Date(); // Current time
+                    
+                    startInput.value = formatDateTime(customStartDate);
+                    endInput.value = formatDateTime(customEndDate);
+                    
+                    console.log(`📅 Applied Custom preset:`);
+                    console.log(`   📊 Start: ${formatDateTime(customStartDate)} (Database start)`);
+                    console.log(`   📊 End: ${formatDateTime(customEndDate)} (Current time)`);
+                    
+                    const dateRangeInfo = document.getElementById('date-range-info');
+                    if (dateRangeInfo) {
+                        dateRangeInfo.style.display = 'none';
+                    }
+                    return;
+                }
+
+                // Hide custom range inputs for presets
+                customRange.style.display = 'none';
+
+                if (btn.dataset.days) {
+                    const days = parseInt(btn.dataset.days);
+                    // Use database data range (from 2023-01-01 to 2023-12-31)
+                    const dataStartDate = new Date(2023, 0, 1, 0, 0); // 2023-01-01 00:00
+                    const dataEndDate = new Date(2023, 11, 31, 23, 59); // 2023-12-31 23:59
+                    
+                    startDate = new Date(dataEndDate.getTime() - (days * 24 * 60 * 60 * 1000));
+                    
+                    // Ensure start date doesn't go before database start
+                    if (startDate < dataStartDate) {
+                        startDate = dataStartDate;
+                    }
+                    
+                    endDate = dataEndDate;
+                } else if (btn.dataset.full) {
+                    // Full year 2023
+                    startDate = new Date(2023, 0, 1, 0, 0); // 2023-01-01 00:00
+                    endDate = new Date(2023, 11, 31, 23, 59); // 2023-12-31 23:59
+                }
+
+                // Format dates for datetime-local input
+                const formatDateTime = (date) => {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    return `${year}-${month}-${day}T${hours}:${minutes}`;
+                };
+
+                startInput.value = formatDateTime(startDate);
+                endInput.value = formatDateTime(endDate);
+
+                // Show detailed date range info
+                const startDateStr = startDate.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric',
+                    weekday: 'short'
+                });
+                const endDateStr = endDate.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric',
+                    weekday: 'short'
+                });
+
+                // Update UI info display
+                const dateRangeInfo = document.getElementById('date-range-info');
+                const dateRangeText = document.getElementById('date-range-text');
+                
+                if (dateRangeInfo && dateRangeText) {
+                    dateRangeInfo.style.display = 'block';
+                    const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                    dateRangeText.textContent = `${startDateStr} → ${endDateStr} (${duration} days)`;
+                }
+
+                console.log(`📅 Applied preset: ${btn.textContent}`);
+                console.log(`   📊 Date Range: ${formatDateTime(startDate)} to ${formatDateTime(endDate)}`);
+                console.log(`   🗓️  From: ${startDateStr}`);
+                console.log(`   🗓️  To: ${endDateStr}`);
+                console.log(`   ⏱️  Duration: ${Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1} days`);
+            });
+        });
+
+        // Initially show custom range (default)
+        customRange.style.display = 'block';
+    }
+
+    // Apply TPS threshold filtering to data
+    applyTpsFiltering(data, minTps, maxTps) {
+        if (!minTps && !maxTps) {
+            return data; // No filtering needed
+        }
+
+        console.log(`🔍 Applying TPS filtering: min=${minTps}, max=${maxTps}`);
+        
+        const filteredData = data.filter(item => {
+            const tps = parseFloat(item.trans_per_sec) || 0;
+            
+            if (minTps && tps < minTps) {
+                return false;
+            }
+            
+            if (maxTps && tps > maxTps) {
+                return false;
+            }
+            
+            return true;
+        });
+
+        console.log(`📊 TPS filtering: ${data.length} → ${filteredData.length} records`);
+        return filteredData;
+    }
+
+    // Apply time aggregation to data
+    applyTimeAggregation(data, aggregationType) {
+        if (aggregationType === '15min') {
+            return data; // No aggregation needed
+        }
+
+        console.log(`⏱️ Applying time aggregation: ${aggregationType}`);
+        
+        const timeGroups = new Map();
+        let intervalMinutes;
+
+        switch (aggregationType) {
+            case '1hour':
+                intervalMinutes = 60;
+                break;
+            case '1day':
+                intervalMinutes = 24 * 60;
+                break;
+            default:
+                return data;
+        }
+
+        data.forEach(item => {
+            const date = new Date(item.date_time);
+            let groupKey;
+
+            if (aggregationType === '1hour') {
+                // Group by hour
+                groupKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:00:00Z`;
+            } else if (aggregationType === '1day') {
+                // Group by day
+                groupKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T12:00:00Z`;
+            }
+
+            if (!timeGroups.has(groupKey)) {
+                timeGroups.set(groupKey, {
+                    date_time: groupKey,
+                    tps_values: [],
+                    system_name: item.system_name
+                });
+            }
+
+            timeGroups.get(groupKey).tps_values.push(parseFloat(item.trans_per_sec) || 0);
+        });
+
+        // Calculate averages
+        const aggregatedData = Array.from(timeGroups.values()).map(group => ({
+            date_time: group.date_time,
+            trans_per_sec: group.tps_values.reduce((sum, val) => sum + val, 0) / group.tps_values.length,
+            system_name: group.system_name,
+            aggregated: true,
+            aggregation_type: aggregationType,
+            sample_count: group.tps_values.length
+        }));
+
+        console.log(`📊 Time aggregation: ${data.length} → ${aggregatedData.length} records`);
+        return aggregatedData;
+    }
+
+    // Apply peak selection filtering to data
+    applyPeakSelection(data, peakSelection) {
+        if (peakSelection === 'all') {
+            return data; // No filtering needed
+        }
+
+        console.log(`🎯 Applying peak selection: ${peakSelection}`);
+        
+        const filteredData = data.filter(item => {
+            const date = new Date(item.date_time);
+            const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+            const dayOfMonth = date.getDate();
+            const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+
+            let isSelected = false;
+            switch (peakSelection) {
+                case 'specific':
+                    // 1st, 16th, and last day of month
+                    isSelected = dayOfMonth === 1 || dayOfMonth === 16 || dayOfMonth === lastDayOfMonth;
+                    break;
+                
+                case 'weekdays':
+                    // Monday to Friday (1-5)
+                    isSelected = dayOfWeek >= 1 && dayOfWeek <= 5;
+                    break;
+                
+                case 'weekends':
+                    // Saturday and Sunday (0, 6)
+                    isSelected = dayOfWeek === 0 || dayOfWeek === 6;
+                    break;
+                
+                default:
+                    isSelected = true;
+            }
+
+            // Debug log for specific days
+            if (peakSelection === 'specific' && isSelected) {
+                console.log(`✅ Selected specific day: ${dayOfMonth}/${date.getMonth() + 1}/${date.getFullYear()} (${dayOfMonth === 1 ? '1st' : dayOfMonth === 16 ? '16th' : 'last'})`);
+            }
+
+            return isSelected;
+        });
+
+        console.log(`🎯 Peak selection: ${data.length} → ${filteredData.length} records`);
+        return filteredData;
     }
 }
 

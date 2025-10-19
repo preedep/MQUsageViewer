@@ -26,21 +26,49 @@
 </div>
 
 <div class="search-panel">
-    <!-- Section 1: Date Range (Common for both Search & Graph) -->
+    <!-- Section 1: Enhanced Date Range with Quick Presets -->
     <div class="criteria-section">
         <div class="section-header">
             <span class="section-icon">📅</span>
             <h3 class="section-title">Date & Time Range</h3>
         </div>
         <div class="section-content">
-            <div class="input-row">
-                <div class="input-group">
-                    <label for="start-datetime">Start Date & Time:</label>
-                    <input type="datetime-local" id="start-datetime" class="datetime-input" />
+            <!-- Quick Time Presets -->
+            <div class="quick-presets">
+                <label class="preset-label">Quick Presets:</label>
+                <div class="preset-buttons">
+                    <button type="button" class="preset-btn" data-days="1" title="Last 1 day from Dec 31, 2023">1D</button>
+                    <button type="button" class="preset-btn" data-days="7" title="Last 7 days from Dec 31, 2023">7D</button>
+                    <button type="button" class="preset-btn" data-days="30" title="Last 30 days from Dec 31, 2023">30D</button>
+                    <button type="button" class="preset-btn" data-days="90" title="Last 3 months from Dec 31, 2023">3M</button>
+                    <button type="button" class="preset-btn" data-full="true" title="Full year 2023 (Jan 1 - Dec 31)">Full Year</button>
+                    <button type="button" class="preset-btn active" data-custom="true" title="Custom range: Flexible dates (2023+ supported, data available 2023 only)">Custom</button>
                 </div>
-                <div class="input-group">
-                    <label for="end-datetime">End Date & Time:</label>
-                    <input type="datetime-local" id="end-datetime" class="datetime-input" />
+                
+                <!-- Date Range Info Display -->
+                <div class="date-range-info" id="date-range-info" style="display: none;">
+                    <div class="info-content">
+                        <span class="info-icon">📅</span>
+                        <span class="info-text" id="date-range-text">Select a preset to see date range</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Custom Date Range -->
+            <div class="custom-range" id="custom-range">
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="start-datetime">Start Date & Time:</label>
+                        <input type="datetime-local" id="start-datetime" class="datetime-input" 
+                               min="2023-01-01T00:00" />
+                        <small class="input-hint">📊 Data available from: Jan 1, 2023 onwards | Flexible range for analysis</small>
+                    </div>
+                    <div class="input-group">
+                        <label for="end-datetime">End Date & Time:</label>
+                        <input type="datetime-local" id="end-datetime" class="datetime-input" 
+                               min="2023-01-01T00:00" />
+                        <small class="input-hint">📊 Data starts: Jan 1, 2023 | End: Current time allowed</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -71,6 +99,48 @@
             <div id="system-names-container" style="display: block; margin-top: 10px;">
                 <label>Select Systems to Display:</label>
                 <div id="system-names-checkboxes"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 2.5: Advanced Filters -->
+    <div class="criteria-section">
+        <div class="section-header">
+            <span class="section-icon">⚡</span>
+            <h3 class="section-title">Advanced Filters</h3>
+        </div>
+        <div class="section-content">
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="min-tps">Min TPS Threshold:</label>
+                    <input type="number" id="min-tps" class="number-input" placeholder="e.g. 1.0" min="0" step="0.1" />
+                </div>
+                <div class="input-group">
+                    <label for="max-tps">Max TPS Threshold:</label>
+                    <input type="number" id="max-tps" class="number-input" placeholder="No limit" min="0" step="0.1" />
+                </div>
+            </div>
+            
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="time-aggregation">📊 Time Aggregation:</label>
+                    <select id="time-aggregation" class="select-input">
+                        <option value="15min" selected>15 Minutes (Raw Data)</option>
+                        <option value="1hour">1 Hour Average</option>
+                        <option value="1day">1 Day Average</option>
+                        <option value="custom">Custom Interval</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="peak-selection">🎯 Peak Selection:</label>
+                    <select id="peak-selection" class="select-input">
+                        <option value="all" selected>All Days</option>
+                        <option value="specific">Specific Days (1st, 16th, Last)</option>
+                        <option value="weekdays">Weekdays Only</option>
+                        <option value="weekends">Weekends Only</option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
@@ -110,32 +180,6 @@
             <div class="checkbox-group">
                 <input type="checkbox" id="show-peaks" />
                 <label for="show-peaks">Show Monthly Peaks Only</label>
-            </div>
-            
-            <!-- Peak Selection Mode -->
-            <div class="peak-selection-container">
-                <label class="peak-selection-label">
-                    <span class="label-icon">📊</span>
-                    <span class="label-text">Peak Selection Mode:</span>
-                </label>
-                <div class="peak-mode-options">
-                    <label class="radio-card">
-                        <input type="radio" name="peak-mode" value="all" checked />
-                        <span class="radio-content">
-                            <span class="radio-icon">📈</span>
-                            <span class="radio-title">All Days</span>
-                            <span class="radio-desc">Show all daily peaks</span>
-                        </span>
-                    </label>
-                    <label class="radio-card">
-                        <input type="radio" name="peak-mode" value="specific" />
-                        <span class="radio-content">
-                            <span class="radio-icon">🎯</span>
-                            <span class="radio-title">Specific Days</span>
-                            <span class="radio-desc">1st, 16th & Last day</span>
-                        </span>
-                    </label>
-                </div>
             </div>
         </div>
     </div>
