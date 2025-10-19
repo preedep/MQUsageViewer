@@ -572,14 +572,21 @@ class ChartManager {
             const colorIndex = index % colors.length;
             const systemData = data[systemName] || [];
             
+            console.log(`📊 Processing ${systemName}: ${systemData.length} data points`);
+            
             // Create a map for quick lookup
             const dataMap = new Map();
             systemData.forEach(item => {
-                dataMap.set(item.date_time, parseFloat(item.trans_per_sec) || 0);
+                const tpsValue = parseFloat(item.trans_per_sec) || 0;
+                dataMap.set(item.date_time, tpsValue);
             });
             
             // Create values array matching the labels
             const values = sortedTimestamps.map(timestamp => dataMap.get(timestamp) || 0);
+            
+            const maxValue = Math.max(...values);
+            const minValue = Math.min(...values);
+            console.log(`📊 ${systemName} chart range: ${minValue} - ${maxValue}`);
             
             datasets.push({
                 label: systemName,
@@ -670,6 +677,12 @@ class ChartManager {
                             font: {
                                 size: 12,
                                 weight: 'bold'
+                            },
+                            filter: function(legendItem, chartData) {
+                                // Only show legend items for datasets that have non-zero data
+                                const dataset = chartData.datasets[legendItem.datasetIndex];
+                                const hasData = dataset.data.some(value => value > 0);
+                                return hasData;
                             }
                         }
                     },
@@ -693,15 +706,21 @@ class ChartManager {
                                 let label = context.dataset.label || '';
                                 const chartInstance = context.chart;
                                 const isMonthly = chartInstance.canvas.dataset.isMonthly === 'true';
+                                const tpsValue = context.parsed.y || 0;
                                 
                                 if (label) {
                                     label += isMonthly ? ' (Monthly Peak): ' : ' (Daily Peak): ';
                                 }
-                                if (context.parsed.y !== null) {
+                                
+                                // Add indicator for zero/no data
+                                if (tpsValue === 0) {
+                                    label += '0 TPS (No Data)';
+                                } else {
                                     label += new Intl.NumberFormat('en-US', { 
                                         maximumFractionDigits: 2 
-                                    }).format(context.parsed.y) + ' TPS';
+                                    }).format(tpsValue) + ' TPS';
                                 }
+                                
                                 return label;
                             },
                             afterBody: function(context) {

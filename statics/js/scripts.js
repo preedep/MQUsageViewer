@@ -549,6 +549,12 @@ class MQDashboard {
         console.log(`✅ Using REAL DATA for ${systemName} - ${data.length} records`);
         console.log(`Sample data:`, data.slice(0, 3));
         
+        // Check TPS values in raw data
+        const tpsValues = data.map(item => parseFloat(item.trans_per_sec) || 0);
+        const maxTps = Math.max(...tpsValues);
+        const minTps = Math.min(...tpsValues);
+        console.log(`📊 ${systemName} TPS range: ${minTps} - ${maxTps}`);
+        
         const rawDataWithSystem = data.map(item => ({...item, system_name: systemName}));
         
         // For aggregate mode, return raw data (will be processed later)
@@ -561,16 +567,18 @@ class MQDashboard {
         if (params.showPeaks) {
             const monthlyPeaks = this.convertToMonthlyPeaks(rawDataWithSystem);
             console.log(`Added ${monthlyPeaks.length} monthly peak records for ${systemName} (from ${data.length} 15-min intervals)`);
+            console.log(`Monthly peaks sample:`, monthlyPeaks.slice(0, 2));
             return monthlyPeaks;
         } else {
             const dailyPeaks = this.convertToDailyPeaks(rawDataWithSystem);
             console.log(`Added ${dailyPeaks.length} daily peak records for ${systemName} (from ${data.length} 15-min intervals)`);
+            console.log(`Daily peaks sample:`, dailyPeaks.slice(0, 2));
             return dailyPeaks;
         }
     }
 
     async handleNoData(systemName, params) {
-        console.warn(`❌ No data found for system: ${systemName} - Using MOCK DATA`);
+        console.warn(`❌ No data found for system: ${systemName}`);
         console.warn(`API Response was: []`);
         console.warn(`Possible causes:`);
         console.warn(`  1. No data in database for this system/function/date range`);
@@ -585,13 +593,42 @@ class MQDashboard {
             if (availableSystems && availableSystems.length > 0 && !availableSystems.includes(systemName)) {
                 console.warn(`⚠️  System "${systemName}" not found in available systems.`);
                 console.warn(`   Available systems: ${availableSystems.join(', ')}`);
-                console.warn(`   Using mock data for missing system.`);
+                console.warn(`   Returning empty data for missing system.`);
+                
+                // Return empty data instead of mock data for systems not in available list
+                return [];
             }
         } catch (e) {
             console.warn(`Could not fetch available systems:`, e);
         }
         
-        return await this.generateFallbackData(systemName, params);
+        // Only use fallback data if system exists but has no data for this date range
+        console.warn(`   System exists but no data for date range - using minimal fallback data`);
+        return await this.generateMinimalFallbackData(systemName, params);
+    }
+
+    async generateMinimalFallbackData(systemName, params) {
+        console.warn(`Using minimal fallback data (mostly zeros) for ${systemName}`);
+        
+        // Generate minimal data with mostly zero values
+        const startDate = new Date(params.startDate);
+        const endDate = new Date(params.endDate);
+        const diffDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+        
+        const minimalData = [];
+        for (let i = 0; i <= Math.min(diffDays, 30); i++) { // Limit to 30 days max
+            const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
+            minimalData.push({
+                date_time: date.toISOString().split('T')[0] + 'T12:00:00Z',
+                trans_per_sec: 0, // Always 0 for missing systems
+                system_name: systemName,
+                isMockData: true,
+                isMinimalData: true
+            });
+        }
+        
+        console.log(`Generated ${minimalData.length} minimal data points for ${systemName}`);
+        return minimalData;
     }
 
     async generateFallbackData(systemName, params) {
@@ -691,12 +728,42 @@ class MQDashboard {
         const processedData = this.chartManager._processMultiSystemData(allData, params.systemNames);
         console.log('Processed data for multi-system chart:', processedData);
         
-        const title = this.generateChartTitle(params);
+        // Filter out systems with no real data (only zeros or empty)
+        const systemsWithData = [];
+        const filteredData = {};
+        
+        params.systemNames.forEach(systemName => {
+            const systemData = processedData[systemName] || [];
+            
+            // Check if system has any non-zero TPS values
+            const hasRealData = systemData.some(item => {
+                const tps = parseFloat(item.trans_per_sec) || 0;
+                return tps > 0 && !item.isMinimalData;
+            });
+            
+            if (hasRealData) {
+                systemsWithData.push(systemName);
+                filteredData[systemName] = systemData;
+                console.log(`✅ Including ${systemName} - has real data`);
+            } else {
+                console.log(`❌ Excluding ${systemName} - no real data (only zeros or minimal data)`);
+            }
+        });
+        
+        if (systemsWithData.length === 0) {
+            console.warn('No systems with real data found');
+            alert('No systems have data for the selected time range and MQ function.');
+            return;
+        }
+        
+        console.log(`Filtered systems with data: ${systemsWithData.join(', ')}`);
+        
+        const title = this.generateChartTitle({...params, systemNames: systemsWithData});
         
         await this.chartManager.generateMultiSystemChart(
             'chart',
-            processedData,
-            params.systemNames,
+            filteredData,
+            systemsWithData,
             {
                 title: title,
                 xLabel: 'Date/Time',
@@ -1061,6 +1128,7 @@ class MQDashboard {
     // Convert 15-minute interval data to daily peak data
     convertToDailyPeaks(rawData) {
         console.log('Converting 15-minute data to daily peaks...');
+        console.log(`Input data sample:`, rawData.slice(0, 2));
         
         // Group data by date and system
         const dailyGroups = new Map();
@@ -1070,6 +1138,7 @@ class MQDashboard {
             const dateKey = date.toISOString().split('T')[0]; // Get YYYY-MM-DD
             const systemName = item.system_name;
             const groupKey = `${dateKey}_${systemName}`;
+            const tpsValue = parseFloat(item.trans_per_sec) || 0;
             
             if (!dailyGroups.has(groupKey)) {
                 dailyGroups.set(groupKey, {
@@ -1081,29 +1150,35 @@ class MQDashboard {
             
             dailyGroups.get(groupKey).intervals.push({
                 time: item.date_time,
-                tps: parseFloat(item.trans_per_sec) || 0
+                tps: tpsValue
             });
         });
+        
+        console.log(`Created ${dailyGroups.size} daily groups`);
         
         // Find daily peaks for each system
         const dailyPeaks = [];
         
-        dailyGroups.forEach(group => {
+        dailyGroups.forEach((group, groupKey) => {
             // Find the maximum TPS for this day and system
-            const maxTps = Math.max(...group.intervals.map(interval => interval.tps));
+            const tpsValues = group.intervals.map(interval => interval.tps);
+            const maxTps = Math.max(...tpsValues);
             
             // Find the time when this peak occurred
             const peakInterval = group.intervals.find(interval => interval.tps === maxTps);
             
-            dailyPeaks.push({
+            const peakRecord = {
                 date_time: group.date + 'T12:00:00Z', // Use noon as representative time
                 trans_per_sec: maxTps,
                 system_name: group.system_name,
                 peak_time: peakInterval ? peakInterval.time : null // Original time of peak
-            });
+            };
+            
+            dailyPeaks.push(peakRecord);
         });
         
         console.log(`Converted ${rawData.length} 15-minute records to ${dailyPeaks.length} daily peaks`);
+        console.log(`Daily peaks sample:`, dailyPeaks.slice(0, 2));
         return dailyPeaks;
     }
 
