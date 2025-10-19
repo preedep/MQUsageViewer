@@ -8,7 +8,7 @@ class MQDashboard {
         
         // Initialize searchable dropdowns
         this.mqFunctionSelect = null;
-        this.systemNameSelect = null;
+        // Note: systemNameSelect removed - using checkboxes only
         
         // Loading overlay
         this.loadingOverlay = null;
@@ -121,10 +121,7 @@ class MQDashboard {
             }
         });
 
-        // Initialize System Name searchable dropdown
-        this.systemNameSelect = new SearchableSelect('system-name-container', {
-            placeholder: 'Select MQ Function First',
-        });
+        // Note: System Name dropdown removed - using checkboxes only
     }
 
     setupEventListeners() {
@@ -162,19 +159,18 @@ class MQDashboard {
 
     async loadSystemNames(funcName) {
         if (!funcName) {
-            this.systemNameSelect.clear();
-            this.systemNameSelect.setPlaceholder('Select MQ Function First');
             document.getElementById('system-names-container').style.display = 'none';
-            this.systemNameSelect.setData([]);
             return;
         }
         
-        this.systemNameSelect.setLoading(true);
+        // Show loading state in the container
+        const systemNamesContainer = document.getElementById('system-names-container');
+        if (systemNamesContainer) {
+            systemNamesContainer.style.display = 'block';
+        }
+        
         try {
             const systems = await this.apiService.fetchSystemNames(funcName);
-            const data = systems.map(s => ({ value: s, text: s }));
-            this.systemNameSelect.setData(data);
-            this.systemNameSelect.setPlaceholder('Select System...');
             
             // Populate system names checkboxes
             const container = document.getElementById('system-names-checkboxes');
@@ -192,7 +188,6 @@ class MQDashboard {
             
             // Setup aggregate systems checkbox event
             const aggregateCheckbox = document.getElementById('aggregate-systems');
-            const systemNamesContainer = document.getElementById('system-names-container');
             
             // Default: select all systems for multi-line display
             setTimeout(() => {
@@ -205,11 +200,13 @@ class MQDashboard {
                 // When unchecked, we'll show separate lines for each selected system
                 console.log('Aggregate mode:', aggregateCheckbox.checked);
             };
+            
+            console.log('✅ System names loaded and checkboxes created');
         } catch (error) {
             console.error('Error loading system names:', error);
-            this.systemNameSelect.setPlaceholder('Error loading systems');
-        } finally {
-            this.systemNameSelect.setLoading(false);
+            // Show error message in the container
+            const container = document.getElementById('system-names-checkboxes');
+            container.innerHTML = '<div class="error-message">Error loading systems</div>';
         }
     }
 
@@ -1306,20 +1303,48 @@ class MQDashboard {
             allFuncsCheckbox.addEventListener('change', (e) => {
                 const isChecked = e.target.checked;
                 
-                // Disable/enable dropdowns based on aggregate mode
+                console.log('🔄 All MQ Functions toggled:', isChecked);
+                
+                // Disable/enable and clear MQ Function dropdown
                 if (this.mqFunctionSelect) {
                     this.mqFunctionSelect.setDisabled(isChecked);
+                    if (isChecked) {
+                        // Clear selection when enabling "All MQ Functions"
+                        this.mqFunctionSelect.clearSelection();
+                        console.log('✅ Cleared MQ Function selection');
+                    }
                 }
-                if (this.systemNameSelect) {
-                    this.systemNameSelect.setDisabled(isChecked);
-                }
+                
+                // Note: System Name dropdown removed - no longer needed
                 
                 // Hide/show system names container
                 const systemNamesContainer = document.getElementById('system-names-container');
                 if (systemNamesContainer) {
-                    systemNamesContainer.style.display = isChecked ? 'none' : 'block';
+                    systemNamesContainer.style.display = isChecked ? 'none' : 'none'; // Hide when checked, also hide when unchecked until MQ Function is selected
+                    
                     if (isChecked) {
+                        // Uncheck aggregate systems when using all functions
                         document.getElementById('aggregate-systems').checked = false;
+                        
+                        // Clear all system checkboxes
+                        const checkboxes = document.querySelectorAll('#system-names-checkboxes input[type="checkbox"]');
+                        checkboxes.forEach(cb => cb.checked = false);
+                        console.log('✅ Cleared all system selections');
+                    } else {
+                        // When unchecking "All MQ Functions", clear system checkboxes and hide container
+                        const checkboxes = document.querySelectorAll('#system-names-checkboxes input[type="checkbox"]');
+                        checkboxes.forEach(cb => cb.checked = false);
+                        
+                        // Clear the checkboxes container
+                        const container = document.getElementById('system-names-checkboxes');
+                        if (container) {
+                            container.innerHTML = '';
+                        }
+                        
+                        // Reset aggregate systems checkbox
+                        document.getElementById('aggregate-systems').checked = false;
+                        
+                        console.log('✅ Cleared all system selections and reset container');
                     }
                 }
             });

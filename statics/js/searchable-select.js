@@ -264,6 +264,11 @@ class SearchableSelect {
         this.close();
     }
     
+    clearSelection() {
+        // Alias for clear() for better semantic naming
+        this.clear();
+    }
+    
     setPlaceholder(placeholder) {
         this.options.placeholder = placeholder;
         this.input.placeholder = placeholder;
@@ -286,6 +291,15 @@ class SearchableSelect {
     
     enable() {
         this.input.disabled = false;
+    }
+    
+    setDisabled(disabled) {
+        // Unified method to enable/disable
+        if (disabled) {
+            this.disable();
+        } else {
+            this.enable();
+        }
     }
 }
 
