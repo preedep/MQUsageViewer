@@ -244,6 +244,10 @@ class MQDashboard {
         const timeInterval = document.getElementById('time-interval').value;
         const grouping = document.getElementById('grouping').value;
         
+        // Get peak mode selection
+        const peakModeRadio = document.querySelector('input[name="peak-mode"]:checked');
+        const peakMode = peakModeRadio ? peakModeRadio.value : 'all';
+        
         const params = {
             startDate,
             endDate,
@@ -255,7 +259,8 @@ class MQDashboard {
             grouping,
             aggregateSystems,  // true = รวมข้อมูล, false = แสดงแยก
             showPeaks: document.getElementById('show-peaks')?.checked || false,
-            allFuncs: document.getElementById('all-funcs')?.checked || false
+            allFuncs: document.getElementById('all-funcs')?.checked || false,
+            peakMode: peakMode  // 'all' or 'specific'
         };
         
         console.log('getSearchParams result:', params);
@@ -616,6 +621,12 @@ class MQDashboard {
 
     logDataSourceSummary(allData) {
         try {
+            // Prevent infinite recursion - check if allData is valid
+            if (!allData || !Array.isArray(allData)) {
+                console.warn('⚠️  Invalid data provided to logDataSourceSummary');
+                return;
+            }
+            
             const realDataCount = allData.filter(item => !item.isMockData).length;
             const mockDataCount = allData.filter(item => item.isMockData).length;
             
@@ -635,17 +646,21 @@ class MQDashboard {
             if (realDataCount > 0) {
                 console.log('✅ SUCCESS: Using real data from database');
                 
-                // Safely extract TPS values without spreading large objects
-                const tpsValues = [];
+                // Safely calculate min/max TPS without spreading large arrays
+                let maxTps = -Infinity;
+                let minTps = Infinity;
+                let validCount = 0;
+                
                 for (const item of allData) {
                     if (!item.isMockData && item.trans_per_sec != null) {
-                        tpsValues.push(parseFloat(item.trans_per_sec) || 0);
+                        const tps = parseFloat(item.trans_per_sec) || 0;
+                        if (tps > maxTps) maxTps = tps;
+                        if (tps < minTps) minTps = tps;
+                        validCount++;
                     }
                 }
                 
-                if (tpsValues.length > 0) {
-                    const maxTps = Math.max(...tpsValues);
-                    const minTps = Math.min(...tpsValues);
+                if (validCount > 0 && maxTps !== -Infinity && minTps !== Infinity) {
                     console.log(`   📊 TPS Range: ${minTps.toFixed(2)} - ${maxTps.toFixed(2)}`);
                     
                     if (maxTps > 1000) {
@@ -742,8 +757,11 @@ class MQDashboard {
                 console.log('Monthly peaks found:', aggregatedData.length);
             } else {
                 // Daily peaks of COMBINED data
-                aggregatedData = this.findDailyPeaksFromCombined(combinedData);
+                aggregatedData = this.findDailyPeaksFromCombined(combinedData, params.peakMode);
                 console.log('Daily peaks found:', aggregatedData.length);
+                if (params.peakMode === 'specific') {
+                    console.log('🎯 Filtered to specific days (1st, 16th, last of month)');
+                }
             }
             
             // Generate chart title
@@ -1093,8 +1111,9 @@ class MQDashboard {
     }
 
     // Find daily peaks from combined data (sum first, then find peak)
-    findDailyPeaksFromCombined(combinedData) {
+    findDailyPeaksFromCombined(combinedData, peakMode = 'all') {
         console.log('Finding daily peaks from combined data, items:', combinedData.length);
+        console.log('Peak mode:', peakMode);
         
         if (!combinedData || combinedData.length === 0) {
             console.warn('No combined data to process');
@@ -1133,7 +1152,53 @@ class MQDashboard {
         });
         
         console.log('Daily peaks found:', dailyPeaks.length);
+        
+        // Filter by peak mode if 'specific'
+        if (peakMode === 'specific') {
+            const filteredPeaks = this.filterSpecificDayPeaks(dailyPeaks);
+            console.log('Filtered to specific days (1st, 16th, last):', filteredPeaks.length);
+            return filteredPeaks;
+        }
+        
         return dailyPeaks.sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
+    }
+    
+    filterSpecificDayPeaks(dailyPeaks) {
+        // Group by month
+        const monthlyGroups = new Map();
+        
+        dailyPeaks.forEach(peak => {
+            const date = new Date(peak.date_time);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            
+            if (!monthlyGroups.has(monthKey)) {
+                monthlyGroups.set(monthKey, []);
+            }
+            
+            monthlyGroups.get(monthKey).push(peak);
+        });
+        
+        // Filter to keep only 1st, 16th, and last day of each month
+        const filteredPeaks = [];
+        
+        monthlyGroups.forEach((peaks, monthKey) => {
+            const [year, month] = monthKey.split('-').map(Number);
+            
+            peaks.forEach(peak => {
+                const date = new Date(peak.date_time);
+                const day = date.getDate();
+                
+                // Get last day of month
+                const lastDay = new Date(year, month, 0).getDate();
+                
+                // Keep if day is 1, 16, or last day
+                if (day === 1 || day === 16 || day === lastDay) {
+                    filteredPeaks.push(peak);
+                }
+            });
+        });
+        
+        return filteredPeaks.sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
     }
     
     // Find monthly peaks from combined data (sum first, then find peak)
@@ -1168,14 +1233,12 @@ class MQDashboard {
                 (item.trans_per_sec || 0) > (max.trans_per_sec || 0) ? item : max
             );
             
-            // Use 15th of month for display
-            const monthDate = new Date(monthKey + '-15T12:00:00Z');
-            
+            // Use actual peak date for display (not 15th)
             monthlyPeaks.push({
-                date_time: monthDate.toISOString(),
+                date_time: peakItem.date_time, // Use actual peak date/time
                 trans_per_sec: peakItem.trans_per_sec || 0,
                 systemData: peakItem.systemData || {},
-                peak_date: peakItem.date_time, // Actual date/time of peak
+                peak_date: peakItem.date_time, // Same as date_time
                 month_year: monthKey
             });
         });
@@ -1221,14 +1284,14 @@ class MQDashboard {
             // Find the time when this peak occurred
             const peakInterval = group.intervals.find(interval => interval.tps === maxTps);
             
-            // Use the 15th of the month as representative date
-            const monthDate = new Date(group.month + '-15T12:00:00Z');
+            // Use actual peak date/time (not 15th)
+            const peakDateTime = peakInterval ? peakInterval.time : new Date(group.month + '-15T12:00:00Z').toISOString();
             
             monthlyPeaks.push({
-                date_time: monthDate.toISOString(),
+                date_time: peakDateTime, // Use actual peak date/time
                 trans_per_sec: maxTps,
                 system_name: group.system_name,
-                peak_time: peakInterval ? peakInterval.time : null, // Original time of peak
+                peak_time: peakDateTime, // Same as date_time
                 month_year: group.month // For display purposes
             });
         });

@@ -9,7 +9,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <!-- CSS and JS with cache busting -->
-    <link rel="stylesheet" href="css/styles.css?v=1.6&t=20241019" />
+    <link rel="stylesheet" href="css/styles.css?v=1.7&t=20241019" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Load modules in dependency order -->
     <script src="js/utils.js?v=1.3&t=20241018"></script>
@@ -67,6 +67,33 @@
         <input type="checkbox" id="show-peaks" />
         <label for="show-peaks">Show Monthly Peaks Only</label>
     </div>
+    
+    <!-- Peak Selection Mode -->
+    <div class="peak-selection-container">
+        <label class="peak-selection-label">
+            <span class="label-icon">📊</span>
+            <span class="label-text">Peak Selection Mode:</span>
+        </label>
+        <div class="peak-mode-options">
+            <label class="radio-card">
+                <input type="radio" name="peak-mode" value="all" checked />
+                <span class="radio-content">
+                    <span class="radio-icon">📈</span>
+                    <span class="radio-title">All Days</span>
+                    <span class="radio-desc">Show all daily peaks</span>
+                </span>
+            </label>
+            <label class="radio-card">
+                <input type="radio" name="peak-mode" value="specific" />
+                <span class="radio-content">
+                    <span class="radio-icon">🎯</span>
+                    <span class="radio-title">Specific Days</span>
+                    <span class="radio-desc">1st, 16th & Last day</span>
+                </span>
+            </label>
+        </div>
+    </div>
+    
     <div class="btn-group">
         <button id="search-btn">Search</button>
         <button id="graph-btn">Generate Graph</button>
@@ -89,7 +116,7 @@
     </div>
 </div>
 
-<script src="js/scripts.js?v=2.7&t=20241019"></script>
+<script src="js/scripts.js?v=3.0&t=20241019"></script>
 
 <!-- Loading Overlay -->
 <div id="loading-overlay" style="
