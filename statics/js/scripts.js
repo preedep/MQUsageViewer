@@ -16,16 +16,21 @@ class MQDashboard {
         this.init();
     }
     
-    showLoading() {
+    showLoading(text = 'Loading...', subtext = 'Please wait while we process your data') {
         if (!this.loadingOverlay) {
             this.loadingOverlay = document.getElementById('loading-overlay');
             console.log('Loading overlay element:', this.loadingOverlay);
         }
         if (this.loadingOverlay) {
-            console.log('🔄 Showing loading overlay');
-            console.log('Current classes:', this.loadingOverlay.className);
+            console.log('🔄 Showing loading overlay:', text);
+            
+            // Update text
+            const loadingText = document.getElementById('loading-text');
+            const loadingSubtext = document.getElementById('loading-subtext');
+            if (loadingText) loadingText.textContent = text;
+            if (loadingSubtext) loadingSubtext.textContent = subtext;
+            
             this.loadingOverlay.classList.add('show');
-            console.log('After adding show:', this.loadingOverlay.className);
         } else {
             console.error('❌ Loading overlay element not found!');
         }
@@ -226,17 +231,54 @@ class MQDashboard {
                 return;
             }
             
-            this.setActiveTab('search');
-            window.Utils?.showLoading?.('Searching...');
+            if (!params.systemNames || params.systemNames.length === 0) {
+                alert('Please select at least one system');
+                return;
+            }
             
-            // Perform search logic here
-            console.log('Search params:', params);
+            this.setActiveTab('search');
+            this.showLoading('Searching...', 'Please wait while we search for your data');
+            
+            console.log('🔍 Performing search with params:', params);
+            
+            // Format dates for API
+            const { startDateTime, endDateTime } = this.formatDatesForAPI(params);
+            
+            // Search for each system
+            const allResults = [];
+            for (const systemName of params.systemNames) {
+                console.log(`Searching for system: ${systemName}`);
+                
+                const response = await this.apiService.searchMqData({
+                    from_datetime: startDateTime,
+                    to_datetime: endDateTime,
+                    mq_function_name: params.mqFunction,
+                    system_name: systemName
+                });
+                
+                if (response.success && response.data && Array.isArray(response.data) && response.data.length > 0) {
+                    console.log(`Found ${response.data.length} records for ${systemName}`);
+                    allResults.push(...response.data);
+                } else {
+                    console.log(`No data found for ${systemName}`);
+                }
+            }
+            
+            console.log(`Total search results: ${allResults.length}`);
+            
+            if (allResults.length > 0) {
+                // Display results in table
+                this.tableManager.displayData(allResults);
+            } else {
+                alert('No data found for the selected criteria');
+                this.tableManager.clearTable();
+            }
             
         } catch (error) {
             console.error('Error performing search:', error);
             alert('Error performing search: ' + (error.message || 'Unknown error'));
         } finally {
-            window.Utils?.hideLoading?.();
+            this.hideLoading();
         }
     }
 
@@ -244,7 +286,7 @@ class MQDashboard {
         console.log('🎯 generateGraph() called');
         try {
             // Show loading overlay
-            this.showLoading();
+            this.showLoading('Generating Graph...', 'Please wait while we process your data');
             
             const params = this.getSearchParams();
             console.log('Generate Graph - Params:', params);

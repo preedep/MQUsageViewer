@@ -87,6 +87,19 @@ class TableManager {
         this.renderTable();
         this.renderPagination();
     }
+
+    displayData(data) {
+        console.log(`📊 Displaying ${data.length} records in table`);
+        this.setData(data);
+        this.render();
+    }
+
+    clearTable() {
+        console.log('🧹 Clearing table');
+        this.tableData = [];
+        document.getElementById('search-result').innerHTML = '<p>No data</p>';
+        document.getElementById('pagination').innerHTML = '';
+    }
 }
 
 // Export for use in other modules
